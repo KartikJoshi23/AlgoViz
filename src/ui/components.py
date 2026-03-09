@@ -1412,6 +1412,121 @@ class Components:
         st.markdown("</div>", unsafe_allow_html=True)
     
     # ==========================================================================
+    # NOTIFICATION BELL ICON (NEW)
+    # ==========================================================================
+    
+    @staticmethod
+    def render_notification_bell_header(alert_count: int = 0, is_live_mode: bool = True):
+        """
+        Render the notification bell icon that displays in the header area.
+        Shows a badge with alert count if there are active alerts.
+        
+        Args:
+            alert_count: Number of active alerts
+            is_live_mode: Whether dashboard is in live mode (bell active) or static mode (bell disabled)
+        """
+        if is_live_mode:
+            # Active bell with potential alerts
+            if alert_count > 0:
+                badge_html = f'<span style="position: absolute; top: -5px; right: -5px; background: #ef4444; color: white; font-size: 10px; font-weight: 700; min-width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: monospace; box-shadow: 0 2px 8px rgba(239, 68, 68, 0.5);">{alert_count}</span>'
+                bell_color = "#f59e0b"
+                shake_animation = "animation: shake 0.5s ease-in-out;"
+            else:
+                badge_html = ""
+                bell_color = "#a0aec0"
+                shake_animation = ""
+            
+            st.markdown(f"""
+            <style>
+            @keyframes shake {{
+                0%, 100% {{ transform: rotate(0deg); }}
+                25% {{ transform: rotate(-10deg); }}
+                50% {{ transform: rotate(10deg); }}
+                75% {{ transform: rotate(-5deg); }}
+            }}
+            </style>
+            <div style="position: relative; display: inline-block; cursor: pointer; {shake_animation}">
+                <span style="font-size: 24px; color: {bell_color};">🔔</span>
+                {badge_html}
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            # Disabled bell for static mode with tooltip
+            st.markdown("""
+            <div style="position: relative; display: inline-block; cursor: not-allowed; opacity: 0.5;" 
+                 title="Alerts available in Live Mode only">
+                <span style="font-size: 24px; color: #4a5568;">🔕</span>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    @staticmethod  
+    def render_notification_popover(alerts, is_live_mode: bool = True):
+        """
+        Render the notification popover content showing recent alerts.
+        This is meant to be used inside a Streamlit expander or popover.
+        
+        Args:
+            alerts: List of Alert objects
+            is_live_mode: Whether dashboard is in live mode
+        """
+        if not is_live_mode:
+            st.markdown("""
+            <div style="background: rgba(30, 35, 45, 0.95); border: 1px solid rgba(100, 100, 100, 0.3); 
+                 border-radius: 12px; padding: 16px; text-align: center;">
+                <span style="font-size: 32px;">🔕</span>
+                <p style="color: #718096; margin-top: 10px; font-size: 13px;">
+                    Alerts are only available in <strong style="color: #10b981;">Live Mode</strong>
+                </p>
+                <p style="color: #4a5568; font-size: 11px; margin-top: 5px;">
+                    Switch to Live Mode in the sidebar to see real-time trading alerts
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            return
+        
+        # Priority colors
+        priority_styles = {
+            "critical": ("#ef4444", "🚨"),
+            "high": ("#f97316", "🔴"),
+            "medium": ("#eab308", "🟡"),
+            "low": ("#22c55e", "🟢"),
+            "info": ("#3b82f6", "ℹ️")
+        }
+        
+        st.markdown("""
+        <div style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; margin-bottom: 12px;">
+            <span style="font-size: 13px; color: #fafafa; font-weight: 600;">🔔 Active Alerts</span>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if not alerts:
+            st.markdown("""
+            <div style="text-align: center; padding: 20px; color: #6b7280;">
+                <span style="font-size: 24px;">✨</span><br>
+                <span style="font-size: 12px;">No active alerts - Market is calm</span>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            for alert in alerts[:6]:  # Max 6 alerts in popover
+                priority_key = alert.priority.value if hasattr(alert.priority, 'value') else str(alert.priority).lower()
+                color, icon = priority_styles.get(priority_key, ("#6b7280", "⚪"))
+                
+                time_str = alert.timestamp.strftime("%H:%M:%S") if hasattr(alert, 'timestamp') else "now"
+                
+                st.markdown(f"""
+                <div style="background: rgba(30, 35, 45, 0.6); border-left: 3px solid {color}; 
+                     border-radius: 0 8px 8px 0; padding: 8px 10px; margin-bottom: 6px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div>
+                            <span style="color: {color}; font-size: 9px; font-weight: 600;">{icon} {priority_key.upper()}</span>
+                            <div style="color: #e2e8f0; font-size: 11px; margin-top: 2px;">{alert.message}</div>
+                        </div>
+                        <span style="color: #4a5568; font-size: 9px; font-family: 'JetBrains Mono';">{time_str}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    # ==========================================================================
     # BACKTEST RESULTS PANEL (NEW)
     # ==========================================================================
     

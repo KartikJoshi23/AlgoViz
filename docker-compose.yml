@@ -1,36 +1,62 @@
-# AlgoViz - Docker Compose Configuration
-# Single command startup: docker-compose up
+# ═══════════════════════════════════════════════════════════════════
+# AlgoViz — Docker Compose (Development)
+# ═══════════════════════════════════════════════════════════════════
+# Run:  docker-compose up --build
+# Stop: docker-compose down
+# ═══════════════════════════════════════════════════════════════════
 
-version: '3.8'
+version: "3.9"
 
 services:
-  algoviz-dashboard:
+  # ── Backend (FastAPI) ──────────────────────────────────────────
+  backend:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
-    container_name: algoviz-live-dashboard
+    container_name: algoviz-backend
     ports:
-      - "8501:8501"
-    restart: unless-stopped
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - backend_data:/app/data
+      - ml_models:/app/ml_models
     environment:
-      - PYTHONUNBUFFERED=1
-      - TZ=UTC
+      - DEBUG=true
+      - LOG_LEVEL=INFO
+      - DATABASE_URL=sqlite+aiosqlite:///data/algoviz.db
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      test: [ "CMD", "curl", "--fail", "http://localhost:8000/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
-    # Resource limits for stability
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-        reservations:
-          memory: 512M
-    # Logging configuration
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+
+  # ── Frontend (React + Vite) ────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: algoviz-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      - VITE_API_URL=http://backend:8000
+    restart: unless-stopped
+  # ── Legacy Streamlit (for comparison / migration) ──────────────
+  # Uncomment to run side-by-side with new system
+  # streamlit:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: algoviz-streamlit
+  #   ports:
+  #     - "8501:8501"
+  #   restart: unless-stopped
+
+volumes:
+  backend_data:
+  ml_models:

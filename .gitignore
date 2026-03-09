@@ -27,3 +27,11 @@ build/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Node
+node_modules/
+
+# Database & ML models
+*.db
+ml_models/
+

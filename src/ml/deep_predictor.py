@@ -657,17 +657,17 @@ class DeepLearningPredictor:
     
     def _determine_action(self, result: DeepPredictionResult) -> str:
         """Determine trading action based on prediction direction."""
-        # Low confidence threshold - if confidence is too low, hold
-        if result.direction_confidence < 0.35:
-            return "HOLD"
+        # Action should ALWAYS match the direction prediction for consistency
+        # The confidence level is shown separately, so action reflects direction
         
-        # High uncertainty means caution
-        if result.prediction_uncertainty > 60:
-            return "CAUTION"
-        
-        # Determine action based on direction (already computed consistently)
         direction = result.direction
         
+        # High uncertainty note - still show direction but user sees low confidence
+        if result.prediction_uncertainty > 60 and result.direction_confidence < 0.4:
+            # Still return action matching direction, but uncertainty is visible
+            pass
+        
+        # Determine action based on direction - MUST match displayed direction
         if direction == DeepPredictionDirection.STRONG_UP:
             return "STRONG BUY"
         elif direction == DeepPredictionDirection.UP:

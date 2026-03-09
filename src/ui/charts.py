@@ -727,10 +727,11 @@ class Charts:
         
         # Apply premium layout
         layout = Theme.get_base_layout("Live Price & VWAP Crossover", height)
+        layout["yaxis"]["title"] = dict(text="Price (USD)", font=dict(size=11, color=Theme.TEXT_MUTED))
         layout["yaxis"]["tickprefix"] = "$"
         layout["yaxis"]["tickformat"] = ",.0f"
         layout["yaxis"]["gridcolor"] = "rgba(255,255,255,0.08)"
-        layout["xaxis"]["title"] = ""
+        layout["xaxis"]["title"] = dict(text="Time", font=dict(size=11, color=Theme.TEXT_MUTED))
         layout["xaxis"]["gridcolor"] = "rgba(255,255,255,0.05)"
         layout["margin"] = dict(l=80, r=70, t=60, b=70)
         layout["legend"] = dict(
@@ -1508,7 +1509,7 @@ class Charts:
         layout["yaxis"]["title"] = dict(text="Volatility (bps)", font=dict(size=11, color=Theme.TEXT_MUTED))
         layout["yaxis"]["range"] = [0, y_max]
         layout["yaxis"]["gridcolor"] = "rgba(255,255,255,0.06)"
-        layout["xaxis"]["title"] = ""
+        layout["xaxis"]["title"] = dict(text="Time", font=dict(size=11, color=Theme.TEXT_MUTED))
         layout["xaxis"]["gridcolor"] = "rgba(255,255,255,0.04)"
         layout["showlegend"] = False
         layout["margin"] = dict(l=55, r=40, t=50, b=60)
@@ -1684,7 +1685,9 @@ class Charts:
         
         # Layout
         layout = Theme.get_base_layout("Live Candlestick Chart (5s candles)", height)
+        layout["xaxis"]["title"] = dict(text="Time", font=dict(size=11, color=Theme.TEXT_MUTED))
         layout["xaxis"]["rangeslider"] = dict(visible=False)
+        layout["yaxis"]["title"] = dict(text="Price (USD)", font=dict(size=11, color=Theme.TEXT_MUTED))
         layout["yaxis"]["tickprefix"] = "$"
         layout["yaxis"]["tickformat"] = ",.0f"
         layout["legend"] = dict(
@@ -2400,9 +2403,10 @@ class Charts:
             )
         
         layout = Theme.get_base_layout("Backtest Equity Curve", height)
+        layout["yaxis"]["title"] = dict(text="Equity (USD)", font=dict(size=11, color=Theme.TEXT_MUTED))
         layout["yaxis"]["tickprefix"] = "$"
         layout["yaxis"]["tickformat"] = ",.0f"
-        layout["xaxis"]["title"] = ""
+        layout["xaxis"]["title"] = dict(text="Time", font=dict(size=11, color=Theme.TEXT_MUTED))
         layout["showlegend"] = False
         
         fig.update_layout(**layout)

@@ -1,0 +1,60 @@
+/**
+ * AlgoViz — Main Application
+ *
+ * Root component with routing, WebSocket connection, and layout.
+ */
+
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Sidebar } from './components/Sidebar';
+import { DashboardPage } from './pages/Dashboard';
+import { AnalyticsPage } from './pages/Analytics';
+import { StrategiesPage } from './pages/Strategies';
+import { AlertsPage } from './pages/Alerts';
+import { OnChainPage } from './pages/OnChain';
+import { SettingsPage } from './pages/Settings';
+import { useWebSocket } from './hooks/useWebSocket';
+import './index.css';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+      staleTime: 5000,
+    },
+  },
+});
+
+function AppContent() {
+  // Establish WebSocket connection
+  useWebSocket();
+
+  return (
+    <div className="app-layout">
+      <Sidebar />
+      <main className="main-content">
+        <Routes>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/strategies" element={<StrategiesPage />} />
+          <Route path="/alerts" element={<AlertsPage />} />
+          <Route path="/onchain" element={<OnChainPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+        </Routes>
+      </main>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AppContent />
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
+}
+
+export default App;

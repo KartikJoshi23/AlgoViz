@@ -1,0 +1,46 @@
+# AlgoViz Backend - Python Dependencies
+# FastAPI + ASGI Server
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Database
+sqlalchemy[asyncio]
+aiosqlite
+
+# Data Validation & Settings
+pydantic
+pydantic-settings
+
+# Authentication
+python-jose[cryptography]
+passlib[bcrypt]
+
+# WebSocket & HTTP
+websockets
+aiohttp
+httpx
+
+# Data Processing
+pandas
+numpy
+scipy
+
+# ML / AI
+scikit-learn
+shap
+joblib
+
+# Scheduling
+apscheduler
+# Utilities
+python-dateutil
+orjson
+
+# Testing
+pytest
+pytest-asyncio
+httpx
+
+# Linting
+ruff
