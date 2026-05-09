@@ -9,7 +9,7 @@ services:
   - type: web
     name: algoviz-backend
     runtime: python
-    region: oregon
+    region: singapore  # Binance blocks US IPs (HTTP 451); Singapore has full access
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
