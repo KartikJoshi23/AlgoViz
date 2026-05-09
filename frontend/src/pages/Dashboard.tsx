@@ -1,121 +1,19 @@
 /**
  * AlgoViz — Dashboard Page
  *
- * Main dashboard with KPIs, charts, and trading intelligence.
+ * Main dashboard with MarketPulse hero, KPIs, live charts, and trading intelligence.
+ * Bloomberg Terminal meets Cyberpunk aesthetic.
  */
 
-import { motion } from 'framer-motion';
+import { useStore } from '../store';
 import { KpiCards } from '../components/KpiCards';
 import { PriceChart } from '../components/PriceChart';
 import { InsightPanel } from '../components/InsightPanel';
-import { useStore } from '../store';
-
-function MetricGauge({ label, value, max, unit, color }: {
-    label: string; value: number; max: number; unit: string; color: string;
-}) {
-    const pct = Math.min((value / max) * 100, 100);
-    return (
-        <div className="card" style={{ padding: 'var(--space-4)' }}>
-            <div className="card-title" style={{ marginBottom: '12px' }}>{label}</div>
-            <div style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: '1.5rem',
-                fontWeight: 700,
-                color,
-                marginBottom: '8px',
-            }}>
-                {value.toFixed(1)} {unit}
-            </div>
-            <div style={{
-                height: 6,
-                background: 'var(--bg-secondary)',
-                borderRadius: 3,
-                overflow: 'hidden',
-            }}>
-                <motion.div
-                    style={{
-                        height: '100%',
-                        background: color,
-                        borderRadius: 3,
-                    }}
-                    animate={{ width: `${pct}%` }}
-                    transition={{ duration: 0.5, ease: 'easeOut' }}
-                />
-            </div>
-        </div>
-    );
-}
-
-export function DashboardPage() {
-    const features = useStore((s) => s.features);
-    const connected = useStore((s) => s.connected);
-
-    return (
-        <div>
-            <div className="page-header">
-                <h1 className="page-title">
-                    Dashboard
-                    {connected && (
-                        <span className="badge badge-green" style={{ marginLeft: 12, fontSize: '0.65rem', verticalAlign: 'middle' }}>
-                            ● LIVE
-                        </span>
-                    )}
-                </h1>
-                <p className="page-subtitle">Real-time market intelligence for {features.symbol}</p>
-            </div>
-
-            {/* KPI Cards */}
-            <KpiCards />
-
-            {/* Charts Row 1: Price + Insights */}
-            <div className="chart-grid">
-                <PriceChart />
-                <InsightPanel />
-            </div>
-
-            {/* Charts Row 2: Metric Gauges */}
-            <div className="chart-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-                <MetricGauge
-                    label="Spread"
-                    value={features.spread_bps}
-                    max={10}
-                    unit="bps"
-                    color={features.spread_bps > 6 ? '#ef4444' : features.spread_bps < 2 ? '#10b981' : '#f59e0b'}
-                />
-                <MetricGauge
-                    label="Trade Velocity"
-                    value={features.velocity}
-                    max={60}
-                    unit="/s"
-                    color={features.velocity > 40 ? '#ef4444' : features.velocity > 20 ? '#f59e0b' : '#10b981'}
-                />
-                <MetricGauge
-                    label="Volatility"
-                    value={features.volatility_bps}
-                    max={30}
-                    unit="bps"
-                    color={features.volatility_bps > 20 ? '#ef4444' : features.volatility_bps > 10 ? '#f59e0b' : '#10b981'}
-                />
-                <MetricGauge
-                    label="Order Imbalance"
-                    value={Math.abs(features.imbalance_pct)}
-                    max={100}
-                    unit="%"
-                    color={Math.abs(features.imbalance_pct) > 50 ? '#ef4444' : '#06b6d4'}
-                />
-            </div>
-
-            {/* Recent Trades */}
-            <div className="card" style={{ marginTop: 'var(--space-4)' }}>
-                <div className="card-header">
-                    <div className="card-title">📋 Recent Trades</div>
-                    <span className="badge badge-cyan">{useStore.getState().trades.length} buffered</span>
-                </div>
-                <RecentTrades />
-            </div>
-        </div>
-    );
-}
+import { MarketPulse } from '../components/MarketPulse';
+import { OrderBookChart } from '../components/OrderBookChart';
+import { VelocityGauge } from '../components/VelocityGauge';
+import { SpreadHeatmap } from '../components/SpreadHeatmap';
+import { VolatilityChart } from '../components/VolatilityChart';
 
 function RecentTrades() {
     const trades = useStore((s) => s.trades);
@@ -156,5 +54,64 @@ function RecentTrades() {
                 ))}
             </tbody>
         </table>
+    );
+}
+
+export function DashboardPage() {
+    const connected = useStore((s) => s.connected);
+    const features = useStore((s) => s.features);
+
+    return (
+        <div>
+            <div className="page-header">
+                <h1 className="page-title">
+                    Dashboard
+                    {connected && (
+                        <span className="badge badge-green" style={{ marginLeft: 12, fontSize: '0.65rem', verticalAlign: 'middle' }}>
+                            ● LIVE
+                        </span>
+                    )}
+                </h1>
+                <p className="page-subtitle">Real-time market intelligence for {features.symbol}</p>
+            </div>
+
+            {/* Row 0: MarketPulse Hero + KPI Cards */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: '240px 1fr',
+                gap: 'var(--space-4)',
+                marginBottom: 'var(--space-4)',
+            }}>
+                <MarketPulse />
+                <KpiCards />
+            </div>
+
+            {/* Row 1: Price Chart + Insight Panel */}
+            <div className="chart-grid">
+                <PriceChart />
+                <InsightPanel />
+            </div>
+
+            {/* Row 2: Order Book + Velocity Gauge */}
+            <div className="chart-grid" style={{ marginTop: 'var(--space-4)' }}>
+                <OrderBookChart />
+                <VelocityGauge />
+            </div>
+
+            {/* Row 3: Spread Heatmap + Volatility Chart */}
+            <div className="chart-grid" style={{ marginTop: 'var(--space-4)' }}>
+                <SpreadHeatmap />
+                <VolatilityChart />
+            </div>
+
+            {/* Row 4: Recent Trades */}
+            <div className="card" style={{ marginTop: 'var(--space-4)' }}>
+                <div className="card-header">
+                    <div className="card-title">📋 Recent Trades</div>
+                    <span className="badge badge-cyan">{useStore.getState().trades.length} buffered</span>
+                </div>
+                <RecentTrades />
+            </div>
+        </div>
     );
 }

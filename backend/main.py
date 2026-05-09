@@ -87,6 +87,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Production Middleware ─────────────────────────────────────────
+from core.middleware import RequestIdMiddleware, TimingMiddleware, RateLimitMiddleware
+
+app.add_middleware(RequestIdMiddleware)
+app.add_middleware(TimingMiddleware)
+app.add_middleware(RateLimitMiddleware, requests_per_minute=120)
+
 
 # ── API Routes ────────────────────────────────────────────────────
 app.include_router(auth_router, prefix="/api/v1")

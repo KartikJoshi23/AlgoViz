@@ -1,37 +1,65 @@
-# Byte-compiled / optimized / DLL files
+# ═══════════════════════════════════════════════════════════════════
+# AlgoViz — .gitignore
+# ═══════════════════════════════════════════════════════════════════
+
+# ── Python ────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyo
+*.egg-info/
+*.egg
+dist/
+build/
 
-# Virtual environment
+# ── Virtual Environment ──────────────────────────────────────────
 .venv/
 venv/
 ENV/
 env/
 
-# IDE
+# ── Node / Frontend ──────────────────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/.vite/
+.npm
+.pnpm-store/
+
+# ── IDE / Editor ─────────────────────────────────────────────────
 .idea/
 .vscode/
 *.swp
 *.swo
+*.sublime-*
+.project
+.settings/
 
-# Distribution / packaging
-dist/
-build/
-*.egg-info/
-
-# Local development
+# ── Environment / Secrets ────────────────────────────────────────
 .env
-*.log
+.env.*
+!.env.example
 
-# OS files
+# ── Databases ────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── ML Models (regenerated at runtime) ───────────────────────────
+backend/ml_models/*.joblib
+backend/ml_models/*.pkl
+
+# ── OS Files ─────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+Desktop.ini
+*.lnk
 
-# Node
-node_modules/
+# ── Logs ─────────────────────────────────────────────────────────
+*.log
+logs/
 
-# Database & ML models
-*.db
-ml_models/
+# ── Docker (local volumes) ───────────────────────────────────────
+docker-compose.override.yml
 
+# ── Legacy / Deprecated ──────────────────────────────────────────
+.streamlit/

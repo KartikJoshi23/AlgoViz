@@ -2,7 +2,7 @@
  * AlgoViz — Zustand Store
  *
  * Central state management for market data, connection status,
- * and user preferences.
+ * toast notifications, and user preferences.
  */
 
 import { create } from 'zustand';
@@ -58,6 +58,20 @@ export interface Alert {
   acknowledged: boolean;
 }
 
+export interface OrderBookLevel {
+  price: number;
+  quantity: number;
+}
+
+export interface Toast {
+  id: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  title: string;
+  message?: string;
+  duration?: number;
+  createdAt: number;
+}
+
 interface AppState {
   // Connection
   connected: boolean;
@@ -69,12 +83,21 @@ interface AppState {
   insights: Insight[];
   alerts: Alert[];
 
-  // Price History (for chart)
+  // Chart Histories
   priceHistory: { timestamp: string; price: number; vwap: number }[];
+  spreadHistory: { timestamp: string; spread_bps: number }[];
+  volatilityHistory: { timestamp: string; volatility_bps: number }[];
+
+  // Order Book
+  orderBook: { bids: OrderBookLevel[]; asks: OrderBookLevel[] };
 
   // UI
   sidebarExpanded: boolean;
   theme: 'dark' | 'light';
+  commandPaletteOpen: boolean;
+
+  // Toasts
+  toasts: Toast[];
 
   // Actions
   setConnected: (connected: boolean) => void;
@@ -83,8 +106,13 @@ interface AppState {
   addTrade: (trade: Trade) => void;
   setInsights: (insights: Insight[]) => void;
   addAlert: (alert: Alert) => void;
+  setOrderBook: (book: { bids: OrderBookLevel[]; asks: OrderBookLevel[] }) => void;
   addPricePoint: (point: { timestamp: string; price: number; vwap: number }) => void;
   toggleSidebar: () => void;
+  toggleTheme: () => void;
+  setCommandPaletteOpen: (open: boolean) => void;
+  addToast: (toast: Omit<Toast, 'id' | 'createdAt'>) => void;
+  removeToast: (id: string) => void;
 }
 
 const defaultFeatures: MarketFeatures = {
@@ -111,6 +139,8 @@ const defaultFeatures: MarketFeatures = {
   timestamp: null,
 };
 
+let _toastId = 0;
+
 export const useStore = create<AppState>((set) => ({
   connected: false,
   wsStatus: 'disconnected',
@@ -119,24 +149,36 @@ export const useStore = create<AppState>((set) => ({
   insights: [],
   alerts: [],
   priceHistory: [],
+  spreadHistory: [],
+  volatilityHistory: [],
+  orderBook: { bids: [], asks: [] },
   sidebarExpanded: true,
   theme: 'dark',
+  commandPaletteOpen: false,
+  toasts: [],
 
   setConnected: (connected) => set({ connected }),
   setWsStatus: (status) => set({ wsStatus: status }),
 
   updateFeatures: (features) =>
-    set((state) => ({
-      features,
-      priceHistory: [
-        ...state.priceHistory.slice(-199),
-        {
-          timestamp: features.timestamp || new Date().toISOString(),
-          price: features.current_price,
-          vwap: features.vwap,
-        },
-      ],
-    })),
+    set((state) => {
+      const ts = features.timestamp || new Date().toISOString();
+      return {
+        features,
+        priceHistory: [
+          ...state.priceHistory.slice(-199),
+          { timestamp: ts, price: features.current_price, vwap: features.vwap },
+        ],
+        spreadHistory: [
+          ...state.spreadHistory.slice(-99),
+          { timestamp: ts, spread_bps: features.spread_bps },
+        ],
+        volatilityHistory: [
+          ...state.volatilityHistory.slice(-99),
+          { timestamp: ts, volatility_bps: features.volatility_bps },
+        ],
+      };
+    }),
 
   addTrade: (trade) =>
     set((state) => ({
@@ -150,6 +192,8 @@ export const useStore = create<AppState>((set) => ({
       alerts: [alert, ...state.alerts.slice(0, 49)],
     })),
 
+  setOrderBook: (book) => set({ orderBook: book }),
+
   addPricePoint: (point) =>
     set((state) => ({
       priceHistory: [...state.priceHistory.slice(-199), point],
@@ -157,4 +201,26 @@ export const useStore = create<AppState>((set) => ({
 
   toggleSidebar: () =>
     set((state) => ({ sidebarExpanded: !state.sidebarExpanded })),
+
+  toggleTheme: () =>
+    set((state) => {
+      const next = state.theme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      return { theme: next };
+    }),
+
+  setCommandPaletteOpen: (open) => set({ commandPaletteOpen: open }),
+
+  addToast: (toast) =>
+    set((state) => ({
+      toasts: [
+        ...state.toasts.slice(-4),
+        { ...toast, id: `toast-${++_toastId}`, createdAt: Date.now() },
+      ],
+    })),
+
+  removeToast: (id) =>
+    set((state) => ({
+      toasts: state.toasts.filter((t) => t.id !== id),
+    })),
 }));

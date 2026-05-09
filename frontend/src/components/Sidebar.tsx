@@ -10,7 +10,6 @@ import {
     Bell,
     Settings,
     GitBranch,
-    Activity,
     Link as LinkIcon,
 } from 'lucide-react';
 

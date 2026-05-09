@@ -1,76 +1,63 @@
-# 📈 AlgoViz - See the Signal in the Noise
-
-A **professional-grade**, real-time algorithmic trading analytics dashboard that streams live BTC/USDT market data from Binance and provides actionable trading intelligence.
-
 <div align="center">
 
-![Dashboard Preview](https://img.shields.io/badge/Status-Production%20Ready-00d4aa?style=for-the-badge)
-![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![Streamlit](https://img.shields.io/badge/Streamlit-1.53-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+# ⚡ AlgoViz
 
-**See the Signal in the Noise**
+### Professional-Grade Algorithmic Trading Intelligence Platform
+
+Real-time market data streaming · ML-powered predictions · On-chain analytics
+
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://typescriptlang.org)
+[![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://python.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 </div>
 
 ---
 
-## 🎯 Key Differentiator
+## 🎯 Overview
 
-> **This is NOT just a visualization dashboard.**
+AlgoViz is a full-stack, production-grade trading intelligence dashboard that streams real-time market data from Binance, computes technical features on-the-fly, runs ML predictions for price direction, and presents everything through a professional dark-mode terminal UI.
 
-Every chart produces **actionable intelligence** with our proprietary 4-component insight system:
-
-| Component | Description |
-|-----------|-------------|
-| 🔍 **Insight** | What is happening in the market right now |
-| ⚡ **Action** | IF → THEN recommendation for immediate execution |
-| 🛡️ **How to Overcome** | Implementation guidance and risk mitigation |
-| 📊 **Expected Impact** | Quantified measurable benefit |
-
-This transforms the dashboard from "showing data" to a **decision support system** for professional traders.
+> **Not a toy project.** This is a complete trading intelligence platform with a real ML pipeline (scikit-learn ensemble), WebSocket data streaming, rate-limited API, and deployment-ready infrastructure.
 
 ---
 
-## ✨ Professional Features
+## ✨ Features
 
-### 🎨 Premium Design
+| Category | Features |
+|---|---|
+| **Real-Time Data** | Binance WebSocket streaming, VWAP/TWAP, spread, velocity, imbalance, volatility |
+| **Dashboard** | MarketPulse animated hero, TradingView price chart, order book depth, velocity gauge, spread heatmap, volatility monitor |
+| **ML Engine** | RandomForest + GradientBoosting ensemble, SHAP explainability, online retraining, model persistence |
+| **Strategies** | Create/manage rule-based strategies, backtest with historical data |
+| **Alerts** | Priority-based alert system with toast notifications and Discord webhook support |
+| **On-Chain** | Placeholder for Foundry-based Ethereum analytics (whale tracking, DEX analysis) |
+| **UX** | Command palette (Ctrl+K), dark/light theme, keyboard navigation, glassmorphism UI |
+| **Production** | Rate limiting, request correlation IDs, response timing, health checks, Docker support |
 
-- **Glassmorphism UI** - Modern frosted glass aesthetic
-- **Dark Theme** - Professional trading terminal appearance
-- **Animated Elements** - Smooth transitions and live indicators
-- **Responsive Layout** - Optimized for all screen sizes
-- **Premium Typography** - Inter & JetBrains Mono fonts
+---
 
-### 📡 Real-Time Data Streams
+## 🏗️ Architecture
 
-- **Trade Stream**: Live BTC/USDT trades from Binance
-- **Order Book**: Top 10 bid/ask levels, updated every 100ms
-- **Zero Latency**: Direct WebSocket connection
-- **No API Key Required**: Uses public Binance endpoints
-- **Auto-Reconnection**: Resilient connection handling
-
-### 📊 Calculated Metrics
-
-| Metric | Formula | Update Rate |
-|--------|---------|-------------|
-| Mid Price | (Best Bid + Best Ask) / 2 | Real-time |
-| Spread (bps) | (Spread / Mid Price) × 10,000 | Real-time |
-| VWAP | Σ(Price × Volume) / Σ(Volume) | 30-second window |
-| Order Imbalance | (Bid Vol - Ask Vol) / Total Vol | Real-time |
-| Trade Velocity | Trades per second | 3-second smoothed |
-| Volatility | Rolling StdDev of returns | 60-second window |
-| Buy Pressure | Buy Volume / Total Volume | 30-second window |
-
-### 📈 Interactive Visualizations
-
-1. **Live Price + VWAP Chart** - Dual line with crossover detection & gradient fills
-2. **Spread Heatmap Timeline** - Color-coded spread history with threshold zones
-3. **Order Book Imbalance** - Gauge-style bar with volume distribution
-4. **Trade Velocity Gauge** - Premium speedometer with baseline comparison
-5. **Volatility Monitor** - Area chart with threshold bands (Low/Moderate/High)
-6. **Insight & Action Panel** - Dynamic AI-driven trading recommendations
+```
+┌─────────────────────────┐      WebSocket       ┌──────────────────────────┐
+│     Frontend (Vercel)    │◄────────────────────►│    Backend (Render)       │
+│                          │      REST API        │                          │
+│  React 19 + Vite         │◄────────────────────►│  FastAPI + SQLAlchemy     │
+│  Zustand + TanStack      │                      │  scikit-learn + SHAP      │
+│  TradingView Charts      │                      │  Binance WebSocket        │
+│  Framer Motion           │                      │  Rate Limiter + Logging   │
+└─────────────────────────┘                      └──────────────────────────┘
+                                                          │
+                                                          ▼
+                                                  ┌──────────────┐
+                                                  │   Binance     │
+                                                  │   WebSocket   │
+                                                  │   (Live Data) │
+                                                  └──────────────┘
+```
 
 ---
 
@@ -78,180 +65,217 @@ This transforms the dashboard from "showing data" to a **decision support system
 
 ### Prerequisites
 
-- Docker Desktop installed and running
-- Internet connection (for Binance WebSocket)
+- **Node.js** ≥ 18 and **npm**
+- **Python** ≥ 3.11
+- **Git**
 
-### One Command Startup
+### 1. Clone
 
 ```bash
-docker-compose up
+git clone https://github.com/KartikJoshi23/AlgoViz.git
+cd AlgoViz
 ```
 
-Then open your browser to: **http://localhost:8501**
+### 2. Backend Setup
 
-### Development Mode (with hot-reload)
+```bash
+cd backend
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS/Linux
+source .venv/bin/activate
+
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
+
+The API is now live at `http://localhost:8000` with docs at `/docs`.
+
+### 3. Frontend Setup
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://localhost:3002` — the dashboard connects to the backend automatically via the dev proxy.
+
+### 4. Docker (Alternative)
 
 ```bash
 docker-compose up --build
-```
-
-### To Stop
-
-```bash
-docker-compose down
+# Backend → localhost:8001
+# Frontend → localhost:3001
 ```
 
 ---
 
-## 📋 Dashboard Layout
+## 🌐 Deployment
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  📈 ALGOVIZ - SEE THE SIGNAL           [🟢 LIVE TRADING]            │
-├──────────────────────────────────────────────────────────────────┤
-│  🟢 Connected to Binance Exchange    Last Update: 10:30:45.123   │
-├──────────────────────────────────────────────────────────────────┤
-│ 💰 PRICE │ 📊 CHANGE │ 📏 SPREAD │ ⚡ VELOCITY │ 📐 VWAP │ ⚖️ IMBAL │
-│ $104,250 │  ▲ 0.15% │  2.3 bps │   15.2/s   │ $104,248 │ +12.5% │
-├────────────────────────────┬─────────────────────────────────────┤
-│  📈 Live Price & VWAP      │  📊 Bid-Ask Spread Timeline         │
-│  [Crossover Detection]     │  [Threshold Zones]                  │
-├────────────────────────────┼─────────────────────────────────────┤
-│  ⚖️ Order Book Imbalance   │  ⚡ Trade Velocity Gauge            │
-│  [Buy/Sell Pressure]       │  [Spike Detection]                  │
-├────────────────────────────┼─────────────────────────────────────┤
-│  📉 Volatility Monitor     │  🎯 TRADING INTELLIGENCE            │
-│  [Risk Bands]              │                                     │
-│                            │  🔴 HIGH: Sell pressure at -55%     │
-│                            │  Action: Tighten stop-loss          │
-│                            │  Impact: Avoid 0.1-0.3% drawdown    │
-├────────────────────────────┴─────────────────────────────────────┤
-│  Buy Pressure: 45.2% │ Volatility: 12.5 bps │ Bid/Ask Volumes   │
-└──────────────────────────────────────────────────────────────────┘
-```
+### Frontend → Vercel
 
----
+1. Import repo on [Vercel](https://vercel.com)
+2. Set **Root Directory** to `frontend`
+3. Set **Framework Preset** to `Vite`
+4. Add environment variable:
+   ```
+   VITE_API_URL = https://your-backend.onrender.com
+   ```
+5. Deploy
 
-## 🔔 Trading Rules Engine
+### Backend → Render
 
-The dashboard implements **10 intelligent trading rules**:
+1. Create a new **Web Service** on [Render](https://render.com)
+2. Connect GitHub repo
+3. Set **Root Directory** to `backend`
+4. Set **Build Command**: `pip install -r requirements.txt`
+5. Set **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+6. Set environment variables:
+   ```
+   ENVIRONMENT = production
+   DEBUG = false
+   SECRET_KEY = <generate-a-strong-key>
+   ```
+7. Deploy — Render auto-detects the `render.yaml`
 
-| # | Condition | Priority | Trigger | Action |
-|---|-----------|----------|---------|--------|
-| 1 | Spread > 6 bps | 🔴 HIGH | Liquidity deteriorating | Pause market orders |
-| 2 | Spread < 2 bps | 🟢 LOW | Optimal execution | Proceed with orders |
-| 3 | Imbalance < -50% | 🔴 HIGH | Strong sell pressure | Tighten stop-loss |
-| 4 | Imbalance > +50% | 🟡 MEDIUM | Buy-side demand | Delay sells |
-| 5 | Volatility > 20 bps | 🔴 HIGH | High risk regime | Reduce position 50% |
-| 6 | Volatility < 10 bps | 🟢 LOW | Range-bound market | Mean-reversion strategy |
-| 7 | Velocity > 2× baseline | 🔴 HIGH | Velocity spike | Increase monitoring |
-| 8 | Velocity < 0.5× baseline | 🟡 MEDIUM | Thin market | Reduce order sizes |
-| 9 | Price > VWAP + 0.1% | 🟡 MEDIUM | Overbought | Wait for pullback |
-| 10 | Price < VWAP - 0.1% | 🟡 MEDIUM | Value zone | Favorable entry |
+> **Important:** After deploying the backend, update the `VITE_API_URL` environment variable on Vercel to point to your Render URL.
 
 ---
 
 ## 📁 Project Structure
 
 ```
-hft-dashboard/
-├── 📄 docker-compose.yml      # Container orchestration
-├── 📄 Dockerfile              # Python 3.11-slim container
-├── 📄 requirements.txt        # Python dependencies
-├── 📄 README.md               # This documentation
-├── 📄 Implementation_Plan.md  # Technical blueprint
-├── 📁 .streamlit/
-│   └── config.toml            # Streamlit dark theme config
-├── 📁 src/
-│   ├── app.py                 # Main Streamlit application
-│   ├── config.py              # Configuration & constants
-│   ├── 📁 data/
-│   │   ├── websocket_handler.py  # Binance WebSocket client
-│   │   └── state_manager.py      # Thread-safe data buffers
-│   ├── 📁 features/
-│   │   └── feature_engine.py     # 9 metric calculations
-│   ├── 📁 decision/
-│   │   ├── rule_engine.py        # 10 trading rules
-│   │   └── insight_generator.py  # Insight formatting
-│   ├── 📁 ui/
-│   │   ├── theme.py              # Glassmorphism CSS
-│   │   ├── charts.py             # 5 Plotly charts
-│   │   └── components.py         # UI components
-│   └── 📁 utils/
-│       └── helpers.py            # Utility functions
-└── 📁 tests/
-    └── test_features.py          # Unit tests
+AlgoViz/
+├── backend/                    # FastAPI backend
+│   ├── api/                    # REST API routers
+│   │   ├── analytics.py        # ML predictions, SHAP, insights
+│   │   ├── alerts.py           # Alert management
+│   │   ├── auth.py             # JWT authentication
+│   │   ├── market.py           # Market data endpoints
+│   │   └── strategies.py       # Strategy CRUD + backtesting
+│   ├── core/                   # Middleware & utilities
+│   │   └── middleware.py       # Rate limit, timing, request IDs
+│   ├── models/                 # SQLAlchemy ORM models
+│   ├── services/               # Business logic
+│   │   ├── market_data.py      # Binance WS, feature engine
+│   │   └── ml_engine.py        # Ensemble ML pipeline + SHAP
+│   ├── ws/                     # WebSocket hub
+│   ├── config.py               # Pydantic settings
+│   ├── database.py             # SQLAlchemy async setup
+│   ├── main.py                 # FastAPI app entry point
+│   └── requirements.txt        # Python dependencies
+│
+├── frontend/                   # React SPA
+│   ├── src/
+│   │   ├── components/         # Reusable UI components
+│   │   │   ├── MarketPulse.tsx  # Animated market heartbeat hero
+│   │   │   ├── PriceChart.tsx   # TradingView lightweight chart
+│   │   │   ├── OrderBookChart   # Depth visualization
+│   │   │   ├── VelocityGauge   # Radial speedometer
+│   │   │   ├── SpreadHeatmap   # Canvas heatmap
+│   │   │   ├── VolatilityChart # Area chart with regimes
+│   │   │   ├── CommandPalette  # Ctrl+K power-user palette
+│   │   │   ├── ToastProvider   # Notification system
+│   │   │   └── ...
+│   │   ├── pages/              # Route pages
+│   │   │   ├── Dashboard.tsx    # Main trading dashboard
+│   │   │   ├── Analytics.tsx    # ML predictions & SHAP
+│   │   │   ├── Strategies.tsx   # Strategy management
+│   │   │   ├── Alerts.tsx       # Alert history
+│   │   │   ├── OnChain.tsx      # On-chain analytics (planned)
+│   │   │   └── Settings.tsx     # Preferences & theme
+│   │   ├── hooks/              # Custom React hooks
+│   │   ├── store.ts            # Zustand global state
+│   │   ├── api.ts              # Axios client
+│   │   └── App.tsx             # Root component
+│   ├── vercel.json             # Vercel SPA config
+│   └── package.json
+│
+├── tests/                      # Test suites
+├── docker-compose.yml          # Docker dev setup
+├── render.yaml                 # Render deployment config
+├── .env.example                # Environment template
+└── README.md
 ```
 
 ---
 
-## 🛠️ Technology Stack
+## 🛠️ Tech Stack
 
-| Layer | Technology | Purpose |
-|-------|------------|---------|
-| **Frontend** | Streamlit 1.53 | Real-time dashboard framework |
-| **Charts** | Plotly 5.18 | Interactive visualizations |
-| **Styling** | Custom CSS | Glassmorphism design |
-| **Data** | Binance WebSocket | Live market data |
-| **Backend** | Python 3.11 | Feature calculations |
-| **Container** | Docker | Deployment & isolation |
-
----
-
-## 🎓 Academic Context
-
-This project was developed for the **Data Visualization & Analytics** course.
-
-### Learning Objectives Demonstrated
-
-1. **Real-time Data Processing** - WebSocket streaming & circular buffers
-2. **Feature Engineering** - 9 calculated trading metrics
-3. **Rule-Based Systems** - 10 trading rules with priority logic
-4. **Interactive Visualization** - 5 professional Plotly charts
-5. **Decision Support Systems** - Actionable insight generation
-6. **Software Engineering** - Modular architecture, Docker deployment
-
-### Evaluation Criteria
-
-- ✅ Technical complexity and correctness
-- ✅ Professional UI/UX design
-- ✅ Real-time data handling
-- ✅ Actionable insights (key differentiator)
-- ✅ Code quality and documentation
-- ✅ Live demo capability
+| Layer | Technology |
+|---|---|
+| **Frontend** | React 19, Vite 7, TypeScript 5.9 |
+| **State Management** | Zustand, TanStack Query |
+| **Charts** | TradingView Lightweight Charts, Canvas API |
+| **Animations** | Framer Motion |
+| **Styling** | Custom CSS design system (glassmorphism dark theme) |
+| **Backend** | FastAPI, SQLAlchemy (async), SQLite |
+| **ML/AI** | scikit-learn (RandomForest + GradientBoosting), SHAP |
+| **Real-Time** | WebSocket (Binance streams → FastAPI hub → React) |
+| **Auth** | JWT (python-jose) |
+| **Deployment** | Vercel (frontend), Render (backend), Docker |
 
 ---
 
-## 🧪 Testing
+## 📸 Screenshots
 
-### Run Unit Tests
+> Screenshots are auto-generated from the running application.
 
-```bash
-docker exec hft-live-dashboard pytest tests/ -v
-```
+| Dashboard | Analytics |
+|---|---|
+| MarketPulse hero, live price chart, order book, velocity gauge, spread heatmap | ML predictions, SHAP feature importance, model info |
 
-### Manual Testing Checklist
+| Strategies | Settings |
+|---|---|
+| Create & backtest trading strategies | Theme toggle, connection status, preferences |
 
-- [ ] Dashboard loads at localhost:8501
-- [ ] Live data streaming (check timestamp)
-- [ ] All 5 charts rendering correctly
-- [ ] Insight panel showing recommendations
-- [ ] Connection status indicator working
-- [ ] KPI header updating in real-time
-- [ ] Disconnect/reconnect recovery
+---
+
+## 📄 API Documentation
+
+Once the backend is running, interactive API docs are available at:
+
+- **Swagger UI**: `http://localhost:8000/docs`
+- **ReDoc**: `http://localhost:8000/redoc`
+- **Health Check**: `http://localhost:8000/health`
+
+### Key Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/health` | Service health + uptime |
+| `GET` | `/api/v1/market/features` | Current computed features |
+| `GET` | `/api/v1/analytics/prediction` | ML price direction prediction |
+| `GET` | `/api/v1/analytics/insights` | Active trading insights |
+| `GET` | `/api/v1/analytics/model-info` | ML model status & metrics |
+| `GET` | `/api/v1/strategies/` | List all strategies |
+| `POST` | `/api/v1/strategies/` | Create a new strategy |
+| `WS` | `/ws` | Real-time data stream |
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ---
 
 ## 📝 License
 
-This project is developed for educational purposes.
+This project is licensed under the MIT License — see the [LICENSE](./LICENSE) file for details.
 
 ---
 
 <div align="center">
 
-**AlgoViz** — *See the Signal in the Noise*
+**Built with ❤️ by [Kartik Joshi](https://github.com/KartikJoshi23)**
 
-Built with ❤️ by Kartik Joshi, Aditya Chitale & Krishna Patel
+⭐ Star this repo if you find it useful!
 
 </div>

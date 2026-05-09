@@ -12,7 +12,7 @@ RUN npm ci
 # Copy source
 COPY . .
 
-EXPOSE 3000
+EXPOSE 3002
 
 # Development mode with hot-reload
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3002"]

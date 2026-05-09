@@ -5,8 +5,8 @@
  */
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useStore, type Insight } from '../store';
-import { AlertTriangle, TrendingUp, TrendingDown, Activity } from 'lucide-react';
+import { useStore } from '../store';
+import { Activity } from 'lucide-react';
 
 function PriorityBadge({ priority }: { priority: string }) {
     const cls = `priority-${priority.toLowerCase()}`;

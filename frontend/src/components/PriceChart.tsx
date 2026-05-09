@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { createChart, type IChartApi, type ISeriesApi, ColorType } from 'lightweight-charts';
+import { createChart, type IChartApi, type ISeriesApi, ColorType, LineSeries } from 'lightweight-charts';
 import { useStore } from '../store';
 
 export function PriceChart() {
@@ -47,14 +47,14 @@ export function PriceChart() {
             },
         });
 
-        const priceSeries = chart.addLineSeries({
+        const priceSeries = chart.addSeries(LineSeries, {
             color: '#06b6d4',
             lineWidth: 2,
             title: 'Price',
             priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
         });
 
-        const vwapSeries = chart.addLineSeries({
+        const vwapSeries = chart.addSeries(LineSeries, {
             color: '#8b5cf6',
             lineWidth: 1,
             lineStyle: 2,

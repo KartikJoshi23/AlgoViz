@@ -36,9 +36,16 @@ class Settings(BaseSettings):
     PORT: int = 8000
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
+        "http://localhost:3002",
         "http://localhost:5173",
         "http://127.0.0.1:3000",
+        "http://127.0.0.1:3002",
         "http://127.0.0.1:5173",
+        # Production deployments
+        "https://algoviz.vercel.app",
+        "https://algo-viz.vercel.app",
+        "https://algoviz.netlify.app",
+        "https://algo-viz.netlify.app",
     ]
 
     # ── Database ─────────────────────────────────────────────────────

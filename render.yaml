@@ -1,0 +1,28 @@
+# ═══════════════════════════════════════════════════════════════════
+# AlgoViz — Render Deployment (Backend)
+# ═══════════════════════════════════════════════════════════════════
+# Render will auto-detect this file and configure the service.
+# Dashboard: https://dashboard.render.com
+# ═══════════════════════════════════════════════════════════════════
+
+services:
+  - type: web
+    name: algoviz-backend
+    runtime: python
+    region: oregon
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+    healthCheckPath: /health
+    autoDeploy: true

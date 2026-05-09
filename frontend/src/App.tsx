@@ -1,7 +1,8 @@
 /**
  * AlgoViz — Main Application
  *
- * Root component with routing, WebSocket connection, and layout.
+ * Root component with routing, WebSocket connection, layout,
+ * command palette, and toast notifications.
  */
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
@@ -14,6 +15,8 @@ import { AlertsPage } from './pages/Alerts';
 import { OnChainPage } from './pages/OnChain';
 import { SettingsPage } from './pages/Settings';
 import { useWebSocket } from './hooks/useWebSocket';
+import { CommandPalette } from './components/CommandPalette';
+import { ToastProvider } from './components/ToastProvider';
 import './index.css';
 
 const queryClient = new QueryClient({
@@ -43,6 +46,8 @@ function AppContent() {
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </main>
+      <CommandPalette />
+      <ToastProvider />
     </div>
   );
 }

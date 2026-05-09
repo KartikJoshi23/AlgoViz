@@ -3,6 +3,8 @@
 # ═══════════════════════════════════════════════════════════════════
 # Run:  docker-compose up --build
 # Stop: docker-compose down
+# Ports: Backend → localhost:8002, Frontend → localhost:3002
+# Note: Smart Contract Scanner uses 8001/3001 — AlgoViz uses 8002/3002
 # ═══════════════════════════════════════════════════════════════════
 
 version: "3.9"
@@ -15,7 +17,7 @@ services:
       dockerfile: Dockerfile
     container_name: algoviz-backend
     ports:
-      - "8000:8000"
+      - "8002:8000" # Host 8002 → Container 8000 (avoids conflict with Smart Contract Scanner on 8001)
     volumes:
       - ./backend:/app
       - backend_data:/app/data
@@ -39,23 +41,13 @@ services:
       dockerfile: Dockerfile
     container_name: algoviz-frontend
     ports:
-      - "3000:3000"
+      - "3002:3002" # Host 3002 → Container 3002 (avoids conflict with Smart Contract Scanner on 3001)
     depends_on:
       backend:
         condition: service_healthy
     environment:
       - VITE_API_URL=http://backend:8000
     restart: unless-stopped
-  # ── Legacy Streamlit (for comparison / migration) ──────────────
-  # Uncomment to run side-by-side with new system
-  # streamlit:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   container_name: algoviz-streamlit
-  #   ports:
-  #     - "8501:8501"
-  #   restart: unless-stopped
 
 volumes:
   backend_data:

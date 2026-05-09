@@ -11,7 +11,7 @@ import { WS_URL } from '../api';
 
 export function useWebSocket() {
     const wsRef = useRef<WebSocket | null>(null);
-    const reconnectTimer = useRef<ReturnType<typeof setTimeout>>();
+    const reconnectTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
     const attempt = useRef(0);
 
     const { setWsStatus, setConnected, updateFeatures, addTrade, setInsights, addAlert } =
