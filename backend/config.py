@@ -46,6 +46,7 @@ class Settings(BaseSettings):
         "https://algo-viz.vercel.app",
         "https://algoviz.netlify.app",
         "https://algo-viz.netlify.app",
+        "https://algoviz-5saw.onrender.com",
     ]
 
     # ── Database ─────────────────────────────────────────────────────

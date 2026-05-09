@@ -178,6 +178,18 @@ class MarketDataService:
 
             except websockets.exceptions.ConnectionClosed:
                 logger.warning("WebSocket connection closed")
+            except websockets.exceptions.InvalidStatusCode as e:
+                if e.status_code == 451:
+                    logger.warning(
+                        "Binance WebSocket blocked (HTTP 451 — geo-restriction). "
+                        "The backend will continue serving API requests without live data. "
+                        "Retrying in 5 minutes..."
+                    )
+                    self._status = "geo_blocked"
+                    self._connected = False
+                    await asyncio.sleep(300)  # 5 min backoff for geo-blocks
+                    continue
+                logger.error(f"WebSocket rejected: HTTP {e.status_code}")
             except Exception as e:
                 logger.error(f"WebSocket error: {e}")
 
@@ -186,7 +198,7 @@ class MarketDataService:
             attempt += 1
 
             if attempt >= max_attempts:
-                logger.error("Max reconnection attempts reached")
+                logger.warning("Max reconnection attempts reached, backing off 60s")
                 self._status = "failed"
                 await asyncio.sleep(60)
                 attempt = 0
