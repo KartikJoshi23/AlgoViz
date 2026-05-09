@@ -30,7 +30,6 @@ from ws.hub import (
     broadcast_alert,
 )
 from services.ml_engine import ml_engine
-from api.analytics import evaluate_rules
 
 logger = logging.getLogger(__name__)
 
@@ -395,6 +394,8 @@ class MarketDataService:
                     prediction = ml_engine.predict()
                     await broadcast_prediction(prediction)
 
+                    # Lazy import to avoid circular dependency
+                    from api.analytics import evaluate_rules
                     insights = evaluate_rules(features_dict)
                     if insights:
                         await broadcast_insight(insights)
