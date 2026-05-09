@@ -1,46 +1,38 @@
 # AlgoViz Backend - Python Dependencies
 # FastAPI + ASGI Server
-fastapi
-uvicorn[standard]
-python-multipart
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
 
 # Database
-sqlalchemy[asyncio]
-aiosqlite
+sqlalchemy[asyncio]>=2.0.0
+aiosqlite>=0.20.0
 
 # Data Validation & Settings
-pydantic
-pydantic-settings
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
 
 # Authentication
-python-jose[cryptography]
-passlib[bcrypt]
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
 
 # WebSocket & HTTP
-websockets
-aiohttp
-httpx
+websockets>=12.0,<14.0
+aiohttp>=3.9.0
+httpx>=0.27.0
 
 # Data Processing
-pandas
-numpy
-scipy
+pandas>=2.0.0
+numpy>=1.26.0
+scipy>=1.12.0
 
 # ML / AI
-scikit-learn
-shap
-joblib
+scikit-learn>=1.4.0
+joblib>=1.3.0
 
 # Scheduling
-apscheduler
+apscheduler>=3.10.0
+
 # Utilities
-python-dateutil
-orjson
-
-# Testing
-pytest
-pytest-asyncio
-httpx
-
-# Linting
-ruff
+python-dateutil>=2.9.0
+orjson>=3.10.0

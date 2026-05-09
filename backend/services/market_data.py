@@ -178,8 +178,10 @@ class MarketDataService:
 
             except websockets.exceptions.ConnectionClosed:
                 logger.warning("WebSocket connection closed")
-            except websockets.exceptions.InvalidStatusCode as e:
-                if e.status_code == 451:
+            except Exception as e:
+                err_str = str(e)
+                # Detect geo-restriction (HTTP 451) — works across all websockets versions
+                if "451" in err_str:
                     logger.warning(
                         "Binance WebSocket blocked (HTTP 451 — geo-restriction). "
                         "The backend will continue serving API requests without live data. "
@@ -187,10 +189,8 @@ class MarketDataService:
                     )
                     self._status = "geo_blocked"
                     self._connected = False
-                    await asyncio.sleep(300)  # 5 min backoff for geo-blocks
+                    await asyncio.sleep(300)
                     continue
-                logger.error(f"WebSocket rejected: HTTP {e.status_code}")
-            except Exception as e:
                 logger.error(f"WebSocket error: {e}")
 
             self._connected = False
