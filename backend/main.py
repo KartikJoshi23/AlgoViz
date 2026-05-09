@@ -79,9 +79,11 @@ app = FastAPI(
 )
 
 # ── CORS ──────────────────────────────────────────────────────────
+# Use regex to match any Vercel/Netlify preview/production URL
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
+    allow_origin_regex=r"https://.*\.(vercel\.app|netlify\.app|onrender\.com)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
