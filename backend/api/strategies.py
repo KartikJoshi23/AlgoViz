@@ -41,14 +41,33 @@ async def _get_or_create_default_user(db: AsyncSession) -> User:
 
 # ── CRUD ──────────────────────────────────────────────────────────
 
+@router.get("/debug")
+async def debug_strategies(db: AsyncSession = Depends(get_db)):
+    """Debug endpoint to test DB access."""
+    import traceback
+    try:
+        # Test raw query
+        result = await db.execute(select(User).limit(1))
+        users = result.scalars().all()
+        return {"status": "ok", "user_count": len(users), "users": [u.username for u in users]}
+    except Exception as e:
+        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
+
 @router.get("/", response_model=List[StrategyResponse])
 async def list_strategies(db: AsyncSession = Depends(get_db)):
     """List all strategies for the default user."""
-    user = await _get_or_create_default_user(db)
-    result = await db.execute(
-        select(Strategy).where(Strategy.user_id == user.id).order_by(Strategy.created_at.desc())
-    )
-    return result.scalars().all()
+    import traceback
+    import logging
+    logger = logging.getLogger("algoviz.strategies")
+    try:
+        user = await _get_or_create_default_user(db)
+        result = await db.execute(
+            select(Strategy).where(Strategy.user_id == user.id).order_by(Strategy.created_at.desc())
+        )
+        return result.scalars().all()
+    except Exception as e:
+        logger.error(f"list_strategies error: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 
 @router.post("/", response_model=StrategyResponse, status_code=status.HTTP_201_CREATED)
