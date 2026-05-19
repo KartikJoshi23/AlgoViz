@@ -1,117 +1,217 @@
 /**
- * AlgoViz — Dashboard Page
+ * AlgoViz — Dashboard Page (Premium Redesign)
  *
- * Main dashboard with MarketPulse hero, KPIs, live charts, and trading intelligence.
- * Bloomberg Terminal meets Cyberpunk aesthetic.
+ * Hero-level trading dashboard with animated ticker, neon KPIs,
+ * glassmorphism cards, and live data visualization.
  */
 
 import { useStore } from '../store';
-import { KpiCards } from '../components/KpiCards';
+import { motion } from 'framer-motion';
 import { PriceChart } from '../components/PriceChart';
 import { InsightPanel } from '../components/InsightPanel';
-import { MarketPulse } from '../components/MarketPulse';
 import { OrderBookChart } from '../components/OrderBookChart';
 import { VelocityGauge } from '../components/VelocityGauge';
 import { SpreadHeatmap } from '../components/SpreadHeatmap';
 import { VolatilityChart } from '../components/VolatilityChart';
+import { TrendingUp, TrendingDown, Activity, Zap, BarChart3, Gauge, Waves, ShieldCheck } from 'lucide-react';
 
-function RecentTrades() {
-    const trades = useStore((s) => s.trades);
-    const recent = trades.slice(-10).reverse();
+/* ── Animated Ticker Tape ─────────────────────────────────────────── */
+function TickerTape() {
+    const { marketData, connected } = useStore();
+    const price = marketData?.price ?? 0;
+    const spread = marketData?.spread_bps ?? 0;
+    const velocity = marketData?.velocity ?? 0;
+    const imbalance = marketData?.imbalance ?? 0;
+    const buyPressure = marketData?.buy_pressure ?? 0.5;
+    const vwap = marketData?.vwap ?? 0;
 
-    if (recent.length === 0) {
-        return (
-            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                Waiting for trade data…
-            </div>
-        );
-    }
+    const items = [
+        { label: 'BTC/USDT', value: `$${price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#06b6d4', icon: '₿' },
+        { label: 'SPREAD', value: `${spread.toFixed(1)} bps`, color: '#8b5cf6', icon: '◇' },
+        { label: 'VELOCITY', value: `${velocity.toFixed(1)}/s`, color: '#f59e0b', icon: '⚡' },
+        { label: 'IMBALANCE', value: `${(imbalance * 100).toFixed(1)}%`, color: imbalance > 0 ? '#10b981' : '#ef4444', icon: '⇅' },
+        { label: 'BUY PRESSURE', value: `${(buyPressure * 100).toFixed(1)}%`, color: buyPressure > 0.5 ? '#10b981' : '#ef4444', icon: '◈' },
+        { label: 'VWAP', value: `$${vwap.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#ec4899', icon: '◆' },
+    ];
+
+    // Duplicate for seamless loop
+    const allItems = [...items, ...items, ...items];
 
     return (
-        <table className="data-table">
-            <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Price</th>
-                    <th>Qty</th>
-                    <th>Side</th>
-                </tr>
-            </thead>
-            <tbody>
-                {recent.map((t, i) => (
-                    <tr key={`${t.trade_id}-${i}`}>
-                        <td>{new Date(t.timestamp).toLocaleTimeString()}</td>
-                        <td style={{ color: t.is_buyer_maker ? '#ef4444' : '#10b981' }}>
-                            ${t.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                        </td>
-                        <td>{t.quantity.toFixed(5)}</td>
-                        <td>
-                            <span className={`badge ${t.is_buyer_maker ? 'badge-red' : 'badge-green'}`}>
-                                {t.is_buyer_maker ? 'SELL' : 'BUY'}
-                            </span>
-                        </td>
-                    </tr>
+        <div className="ticker-tape">
+            <motion.div
+                className="ticker-track"
+                animate={{ x: ['0%', '-33.33%'] }}
+                transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
+            >
+                {allItems.map((item, i) => (
+                    <div key={i} className="ticker-item">
+                        <span className="ticker-icon" style={{ color: item.color }}>{item.icon}</span>
+                        <span className="ticker-label">{item.label}</span>
+                        <span className="ticker-value" style={{ color: item.color }}>{item.value}</span>
+                        <span className="ticker-separator">│</span>
+                    </div>
                 ))}
-            </tbody>
-        </table>
+            </motion.div>
+            <div className="ticker-fade-left" />
+            <div className="ticker-fade-right" />
+        </div>
     );
 }
 
+/* ── Hero KPI Card ────────────────────────────────────────────────── */
+function HeroKpi({ icon: Icon, label, value, change, color, delay = 0 }: {
+    icon: React.ElementType; label: string; value: string;
+    change?: string; color: string; delay?: number;
+}) {
+    return (
+        <motion.div
+            className="hero-kpi"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay, duration: 0.5 }}
+            whileHover={{ y: -6, scale: 1.02 }}
+            style={{ '--kpi-color': color } as React.CSSProperties}
+        >
+            <div className="hero-kpi-glow" />
+            <div className="hero-kpi-icon">
+                <Icon size={20} />
+            </div>
+            <div className="hero-kpi-label">{label}</div>
+            <div className="hero-kpi-value">{value}</div>
+            {change && (
+                <div className="hero-kpi-change" style={{
+                    color: change.startsWith('+') ? '#10b981' : change.startsWith('-') ? '#ef4444' : '#8888aa'
+                }}>
+                    {change}
+                </div>
+            )}
+        </motion.div>
+    );
+}
+
+/* ── Dashboard Page ───────────────────────────────────────────────── */
 export function DashboardPage() {
     const connected = useStore((s) => s.connected);
     const features = useStore((s) => s.features);
+    const marketData = useStore((s) => s.marketData);
+    const trades = useStore((s) => s.trades);
+
+    const price = marketData?.price ?? 0;
+    const spread = marketData?.spread_bps ?? 0;
+    const vwap = marketData?.vwap ?? 0;
+    const velocity = marketData?.velocity ?? 0;
+    const imbalance = marketData?.imbalance ?? 0;
+    const buyPressure = marketData?.buy_pressure ?? 0.5;
+    const volatility = marketData?.volatility_bps ?? 0;
+
+    const recent = trades.slice(-8).reverse();
 
     return (
-        <div>
-            <div className="page-header">
-                <h1 className="page-title">
-                    Dashboard
-                    {connected && (
-                        <span className="badge badge-green" style={{ marginLeft: 12, fontSize: '0.65rem', verticalAlign: 'middle' }}>
-                            ● LIVE
-                        </span>
-                    )}
-                </h1>
-                <p className="page-subtitle">Real-time market intelligence for {features.symbol}</p>
+        <div className="dashboard">
+            {/* Ticker Tape */}
+            <TickerTape />
+
+            {/* Page Header */}
+            <motion.div
+                className="dash-header"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+            >
+                <div>
+                    <h1 className="dash-title">
+                        Dashboard
+                        {connected && (
+                            <motion.span
+                                className="dash-live-badge"
+                                animate={{ opacity: [1, 0.5, 1] }}
+                                transition={{ duration: 2, repeat: Infinity }}
+                            >
+                                ● LIVE
+                            </motion.span>
+                        )}
+                    </h1>
+                    <p className="dash-subtitle">Real-time market intelligence for {features.symbol}</p>
+                </div>
+            </motion.div>
+
+            {/* Hero KPI Row */}
+            <div className="hero-kpi-grid">
+                <HeroKpi icon={TrendingUp} label="PRICE" value={`$${price.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                    change={marketData?.price_change_pct ? `${marketData.price_change_pct > 0 ? '+' : ''}${marketData.price_change_pct.toFixed(2)}%` : undefined}
+                    color="#06b6d4" delay={0.05} />
+                <HeroKpi icon={Activity} label="SPREAD" value={`${spread.toFixed(1)} bps`} color="#8b5cf6" delay={0.1} />
+                <HeroKpi icon={Gauge} label="VWAP" value={`$${vwap.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} color="#f59e0b" delay={0.15} />
+                <HeroKpi icon={Zap} label="VELOCITY" value={`${velocity.toFixed(1)}/s`} color="#ec4899" delay={0.2} />
+                <HeroKpi icon={BarChart3} label="IMBALANCE" value={`${(imbalance * 100).toFixed(1)}%`} color={imbalance > 0 ? '#10b981' : '#ef4444'} delay={0.25} />
+                <HeroKpi icon={Waves} label="VOLATILITY" value={`${volatility.toFixed(1)} bps`} color="#f97316" delay={0.3} />
+                <HeroKpi icon={ShieldCheck} label="BUY PRESSURE" value={`${(buyPressure * 100).toFixed(1)}%`} color={buyPressure > 0.5 ? '#10b981' : '#ef4444'} delay={0.35} />
             </div>
 
-            {/* Row 0: MarketPulse Hero + KPI Cards */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: '240px 1fr',
-                gap: 'var(--space-4)',
-                marginBottom: 'var(--space-4)',
-            }}>
-                <MarketPulse />
-                <KpiCards />
+            {/* Charts Row 1 */}
+            <div className="dash-grid-2">
+                <motion.div className="card" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
+                    <PriceChart />
+                </motion.div>
+                <motion.div className="card" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
+                    <InsightPanel />
+                </motion.div>
             </div>
 
-            {/* Row 1: Price Chart + Insight Panel */}
-            <div className="chart-grid">
-                <PriceChart />
-                <InsightPanel />
+            {/* Charts Row 2 */}
+            <div className="dash-grid-2">
+                <motion.div className="card" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }}>
+                    <OrderBookChart />
+                </motion.div>
+                <motion.div className="card" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
+                    <VelocityGauge />
+                </motion.div>
             </div>
 
-            {/* Row 2: Order Book + Velocity Gauge */}
-            <div className="chart-grid" style={{ marginTop: 'var(--space-4)' }}>
-                <OrderBookChart />
-                <VelocityGauge />
+            {/* Charts Row 3 */}
+            <div className="dash-grid-2">
+                <motion.div className="card" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45 }}>
+                    <SpreadHeatmap />
+                </motion.div>
+                <motion.div className="card" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
+                    <VolatilityChart />
+                </motion.div>
             </div>
 
-            {/* Row 3: Spread Heatmap + Volatility Chart */}
-            <div className="chart-grid" style={{ marginTop: 'var(--space-4)' }}>
-                <SpreadHeatmap />
-                <VolatilityChart />
-            </div>
-
-            {/* Row 4: Recent Trades */}
-            <div className="card" style={{ marginTop: 'var(--space-4)' }}>
+            {/* Recent Trades */}
+            <motion.div className="card" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.55 }}>
                 <div className="card-header">
                     <div className="card-title">📋 Recent Trades</div>
-                    <span className="badge badge-cyan">{useStore.getState().trades.length} buffered</span>
+                    <span className="badge badge-cyan">{trades.length} buffered</span>
                 </div>
-                <RecentTrades />
-            </div>
+                {recent.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                        Waiting for trade data…
+                    </div>
+                ) : (
+                    <table className="data-table">
+                        <thead>
+                            <tr><th>Time</th><th>Price</th><th>Qty</th><th>Side</th></tr>
+                        </thead>
+                        <tbody>
+                            {recent.map((t, i) => (
+                                <tr key={`${t.trade_id}-${i}`}>
+                                    <td>{new Date(t.timestamp).toLocaleTimeString()}</td>
+                                    <td style={{ color: t.is_buyer_maker ? '#ef4444' : '#10b981' }}>
+                                        ${t.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                                    </td>
+                                    <td>{t.quantity.toFixed(5)}</td>
+                                    <td>
+                                        <span className={`badge ${t.is_buyer_maker ? 'badge-red' : 'badge-green'}`}>
+                                            {t.is_buyer_maker ? 'SELL' : 'BUY'}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
+            </motion.div>
         </div>
     );
 }

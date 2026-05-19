@@ -740,6 +740,124 @@ a:hover {
   color: var(--accent-cyan);
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   DASHBOARD — Premium Components
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Ticker Tape ──────────────────────────────────────────────────── */
+.ticker-tape {
+  position: relative;
+  overflow: hidden;
+  background: rgba(8, 8, 16, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-5);
+  height: 38px;
+}
+.ticker-track {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  white-space: nowrap;
+  will-change: transform;
+}
+.ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+}
+.ticker-icon { font-size: 0.85rem; }
+.ticker-label { color: var(--text-muted); font-weight: 500; }
+.ticker-value { font-weight: 700; }
+.ticker-separator { color: rgba(255, 255, 255, 0.08); margin: 0 4px; }
+.ticker-fade-left,
+.ticker-fade-right {
+  position: absolute;
+  top: 0; bottom: 0; width: 60px; z-index: 2; pointer-events: none;
+}
+.ticker-fade-left { left: 0; background: linear-gradient(90deg, rgba(8,8,16,0.9), transparent); }
+.ticker-fade-right { right: 0; background: linear-gradient(270deg, rgba(8,8,16,0.9), transparent); }
+
+/* ── Dashboard Header ─────────────────────────────────────────────── */
+.dash-header { margin-bottom: var(--space-5); }
+.dash-title { font-size: 1.6rem; font-weight: 800; display: flex; align-items: center; gap: var(--space-3); }
+.dash-live-badge {
+  font-size: 0.65rem; font-weight: 700; color: #10b981;
+  background: rgba(16,185,129,0.1); padding: 3px 10px;
+  border-radius: 100px; border: 1px solid rgba(16,185,129,0.2); letter-spacing: 0.05em;
+}
+.dash-subtitle { color: var(--text-secondary); font-size: 0.88rem; margin-top: 4px; }
+
+/* ── Hero KPI Grid ────────────────────────────────────────────────── */
+.hero-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: var(--space-5);
+}
+.hero-kpi {
+  position: relative;
+  padding: 16px 18px;
+  border-radius: var(--radius-lg);
+  background: rgba(12, 12, 24, 0.5);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  cursor: default;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.hero-kpi::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: var(--kpi-color, #06b6d4);
+  box-shadow: 0 0 12px var(--kpi-color, #06b6d4);
+}
+.hero-kpi:hover {
+  transform: translateY(-6px) scale(1.03);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 0 30px color-mix(in srgb, var(--kpi-color, #06b6d4) 15%, transparent);
+}
+.hero-kpi-glow {
+  position: absolute;
+  top: -20px; right: -20px; width: 80px; height: 80px;
+  border-radius: 50%;
+  background: var(--kpi-color, #06b6d4);
+  opacity: 0.06; filter: blur(25px);
+  pointer-events: none; transition: opacity 0.4s ease;
+}
+.hero-kpi:hover .hero-kpi-glow { opacity: 0.15; }
+.hero-kpi-icon { color: var(--kpi-color, #06b6d4); margin-bottom: 8px; opacity: 0.8; }
+.hero-kpi-label {
+  font-size: 0.65rem; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; margin-bottom: 4px;
+}
+.hero-kpi-value {
+  font-size: 1.25rem; font-weight: 800; font-family: var(--font-mono);
+  color: var(--text-primary);
+  text-shadow: 0 0 20px color-mix(in srgb, var(--kpi-color, #06b6d4) 25%, transparent);
+}
+.hero-kpi-change { font-size: 0.72rem; font-weight: 600; font-family: var(--font-mono); margin-top: 4px; }
+
+/* ── Dashboard Grid ───────────────────────────────────────────────── */
+.dash-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+@media (max-width: 1000px) {
+  .dash-grid-2 { grid-template-columns: 1fr; }
+  .hero-kpi-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 600px) {
+  .hero-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
 /* ── Animations ───────────────────────────────────────────────────── */
 @keyframes fadeInUp {
   from {
