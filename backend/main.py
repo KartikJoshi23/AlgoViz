@@ -95,6 +95,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Global Exception Handler (for debugging 500 errors) ──────────
+from fastapi import Request
+from fastapi.responses import JSONResponse
+import traceback
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Return detailed error info instead of generic 500."""
+    tb = traceback.format_exc()
+    logger.error(f"Unhandled error on {request.method} {request.url}: {exc}\n{tb}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "type": type(exc).__name__, "traceback": tb.split("\n")[-5:]},
+    )
+
 
 # ── API Routes ────────────────────────────────────────────────────
 app.include_router(auth_router, prefix="/api/v1")
