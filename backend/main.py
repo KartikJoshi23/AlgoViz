@@ -7,6 +7,8 @@ FastAPI entry point with lifespan events, CORS, routing, and WebSocket.
 
 import logging
 import time
+import sys
+import traceback
 from contextlib import asynccontextmanager
 from datetime import datetime
 
@@ -14,17 +16,6 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
-from database import init_db, close_db
-from services.market_data import market_service
-from ws.hub import ws_manager
-
-# API Routers
-from api.market import router as market_router
-from api.strategies import router as strategies_router
-from api.alerts import router as alerts_router
-from api.analytics import router as analytics_router
-from api.auth import router as auth_router
-
 
 # ── Logging ───────────────────────────────────────────────────────
 logging.basicConfig(
@@ -37,6 +28,59 @@ logger = logging.getLogger("algoviz")
 # ── Startup time tracking ─────────────────────────────────────────
 _start_time = time.time()
 
+# ── Safe imports (catch any import failures) ──────────────────────
+try:
+    from database import init_db, close_db
+    _db_available = True
+except Exception as e:
+    logger.error(f"Database import failed: {e}")
+    _db_available = False
+    async def init_db(): pass
+    async def close_db(): pass
+
+try:
+    from services.market_data import market_service
+    _market_available = True
+except Exception as e:
+    logger.error(f"Market data import failed: {e}")
+    _market_available = False
+    class _DummyMarket:
+        is_connected = False
+        async def start(self): pass
+        async def stop(self): pass
+        def get_features(self): return type('F', (), {'to_dict': lambda self: {}})()
+        def get_trades(self, limit=50): return []
+        def get_order_book(self): return {"bids": [], "asks": []}
+        def get_stats(self): return {"connected": False, "status": "unavailable"}
+    market_service = _DummyMarket()
+
+try:
+    from ws.hub import ws_manager
+    _ws_available = True
+except Exception as e:
+    logger.error(f"WebSocket hub import failed: {e}")
+    _ws_available = False
+    class _DummyWS:
+        active_count = 0
+        async def connect(self, ws): pass
+        async def disconnect(self, ws): pass
+    ws_manager = _DummyWS()
+
+# API Routers (safe imports)
+_routers = []
+for module_name, router_name in [
+    ("api.market", "router"),
+    ("api.strategies", "router"),
+    ("api.alerts", "router"),
+    ("api.analytics", "router"),
+    ("api.auth", "router"),
+]:
+    try:
+        mod = __import__(module_name, fromlist=[router_name])
+        _routers.append((module_name, getattr(mod, router_name)))
+    except Exception as e:
+        logger.error(f"Router import failed ({module_name}): {e}")
+
 
 # ── Lifespan ──────────────────────────────────────────────────────
 @asynccontextmanager
@@ -46,22 +90,33 @@ async def lifespan(app: FastAPI):
     logger.info("  AlgoViz Backend Starting...")
     logger.info(f"  Version: {settings.APP_VERSION}")
     logger.info(f"  Environment: {settings.ENVIRONMENT}")
+    logger.info(f"  Python: {sys.version}")
     logger.info("═" * 60)
 
-    # Initialize database
-    await init_db()
-    logger.info("✓ Database initialized")
+    try:
+        await init_db()
+        logger.info("✓ Database initialized")
+    except Exception as e:
+        logger.error(f"Database init failed: {e}")
 
-    # Start market data service
-    await market_service.start()
-    logger.info("✓ Market data service started")
+    try:
+        await market_service.start()
+        logger.info("✓ Market data service started")
+    except Exception as e:
+        logger.error(f"Market service start failed: {e}")
 
     yield  # Application runs here
 
     # Shutdown
     logger.info("Shutting down...")
-    await market_service.stop()
-    await close_db()
+    try:
+        await market_service.stop()
+    except Exception:
+        pass
+    try:
+        await close_db()
+    except Exception:
+        pass
     logger.info("Shutdown complete")
 
 
@@ -79,30 +134,31 @@ app = FastAPI(
 )
 
 # ── CORS ──────────────────────────────────────────────────────────
-# Use regex to match any Vercel/Netlify preview/production URL
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_origin_regex=r"https://.*\.(vercel\.app|netlify\.app|onrender\.com)",
+    allow_origins=["*"],  # Allow all origins for production reliability
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ── Production Middleware ─────────────────────────────────────────
-from core.middleware import RequestIdMiddleware, TimingMiddleware, RateLimitMiddleware
-
-app.add_middleware(RequestIdMiddleware)
-app.add_middleware(TimingMiddleware)
-app.add_middleware(RateLimitMiddleware, requests_per_minute=120)
+# ── Production Middleware (safe) ──────────────────────────────────
+try:
+    from core.middleware import RequestIdMiddleware, TimingMiddleware, RateLimitMiddleware
+    app.add_middleware(RequestIdMiddleware)
+    app.add_middleware(TimingMiddleware)
+    app.add_middleware(RateLimitMiddleware, requests_per_minute=120)
+    logger.info("✓ Production middleware loaded")
+except Exception as e:
+    logger.warning(f"Middleware load failed (non-critical): {e}")
 
 
 # ── API Routes ────────────────────────────────────────────────────
-app.include_router(auth_router, prefix="/api/v1")
-app.include_router(market_router, prefix="/api/v1")
-app.include_router(strategies_router, prefix="/api/v1")
-app.include_router(alerts_router, prefix="/api/v1")
-app.include_router(analytics_router, prefix="/api/v1")
+for module_name, router in _routers:
+    try:
+        app.include_router(router, prefix="/api/v1")
+    except Exception as e:
+        logger.error(f"Router registration failed ({module_name}): {e}")
 
 
 # ── WebSocket Endpoint ────────────────────────────────────────────
@@ -112,10 +168,7 @@ async def websocket_endpoint(websocket: WebSocket):
     await ws_manager.connect(websocket)
     try:
         while True:
-            # Keep connection alive; listen for client messages
             data = await websocket.receive_text()
-            # Client can send commands like {"type": "subscribe", "channel": "trades"}
-            # For now, all clients receive all broadcasts
     except WebSocketDisconnect:
         await ws_manager.disconnect(websocket)
 
@@ -127,9 +180,12 @@ async def health():
     return {
         "status": "ok",
         "version": settings.APP_VERSION,
+        "python": sys.version,
         "uptime_seconds": round(time.time() - _start_time, 1),
         "market_connected": market_service.is_connected,
         "ws_clients": ws_manager.active_count,
+        "db_available": _db_available,
+        "market_available": _market_available,
         "timestamp": datetime.utcnow().isoformat(),
     }
 
