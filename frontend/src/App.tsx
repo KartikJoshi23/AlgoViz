@@ -8,6 +8,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Navbar } from './components/Navbar';
+import { AnimatedBackground } from './components/AnimatedBackground';
 import { DashboardPage } from './pages/Dashboard';
 import { AnalyticsPage } from './pages/Analytics';
 import { StrategiesPage } from './pages/Strategies';
@@ -35,6 +36,7 @@ function AppContent() {
 
   return (
     <div className="app-layout">
+      <AnimatedBackground />
       <Navbar />
       <main className="main-content">
         <Routes>
