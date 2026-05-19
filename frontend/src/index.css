@@ -791,6 +791,18 @@ a:hover {
 }
 .dash-subtitle { color: var(--text-secondary); font-size: 0.88rem; margin-top: 4px; }
 
+/* ── Dashboard Hero Row (MarketPulse + KPIs side by side) ─────── */
+.dash-hero-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .dash-hero-row { grid-template-columns: 1fr; }
+}
+
 /* ── Hero KPI Grid ────────────────────────────────────────────────── */
 .hero-kpi-grid {
   display: grid;

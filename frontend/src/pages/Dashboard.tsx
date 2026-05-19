@@ -8,6 +8,7 @@
 import { useStore } from '../store';
 import { motion } from 'framer-motion';
 import { PriceChart } from '../components/PriceChart';
+import { MarketPulse } from '../components/MarketPulse';
 import { InsightPanel } from '../components/InsightPanel';
 import { OrderBookChart } from '../components/OrderBookChart';
 import { VelocityGauge } from '../components/VelocityGauge';
@@ -134,17 +135,22 @@ export function DashboardPage() {
                 </div>
             </motion.div>
 
-            {/* Hero KPI Row */}
-            <div className="hero-kpi-grid">
-                <HeroKpi icon={TrendingUp} label="PRICE" value={`$${price.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
-                    change={features.price_change_pct ? `${features.price_change_pct > 0 ? '+' : ''}${features.price_change_pct.toFixed(2)}%` : undefined}
-                    color="#06b6d4" delay={0.05} />
-                <HeroKpi icon={Activity} label="SPREAD" value={`${spread.toFixed(1)} bps`} color="#8b5cf6" delay={0.1} />
-                <HeroKpi icon={Gauge} label="VWAP" value={`$${vwap.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} color="#f59e0b" delay={0.15} />
-                <HeroKpi icon={Zap} label="VELOCITY" value={`${velocity.toFixed(1)}/s`} color="#ec4899" delay={0.2} />
-                <HeroKpi icon={BarChart3} label="IMBALANCE" value={`${(imbalance * 100).toFixed(1)}%`} color={imbalance > 0 ? '#10b981' : '#ef4444'} delay={0.25} />
-                <HeroKpi icon={Waves} label="VOLATILITY" value={`${volatility.toFixed(1)} bps`} color="#f97316" delay={0.3} />
-                <HeroKpi icon={ShieldCheck} label="BUY PRESSURE" value={`${(buyPressure * 100).toFixed(1)}%`} color={buyPressure > 0.5 ? '#10b981' : '#ef4444'} delay={0.35} />
+            {/* Market Pulse + KPIs */}
+            <div className="dash-hero-row">
+                <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
+                    <MarketPulse />
+                </motion.div>
+                <div className="hero-kpi-grid">
+                    <HeroKpi icon={TrendingUp} label="PRICE" value={`$${price.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                        change={features.price_change_pct ? `${features.price_change_pct > 0 ? '+' : ''}${features.price_change_pct.toFixed(2)}%` : undefined}
+                        color="#06b6d4" delay={0.05} />
+                    <HeroKpi icon={Activity} label="SPREAD" value={`${spread.toFixed(1)} bps`} color="#8b5cf6" delay={0.1} />
+                    <HeroKpi icon={Gauge} label="VWAP" value={`$${vwap.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} color="#f59e0b" delay={0.15} />
+                    <HeroKpi icon={Zap} label="VELOCITY" value={`${velocity.toFixed(1)}/s`} color="#ec4899" delay={0.2} />
+                    <HeroKpi icon={BarChart3} label="IMBALANCE" value={`${(imbalance * 100).toFixed(1)}%`} color={imbalance > 0 ? '#10b981' : '#ef4444'} delay={0.25} />
+                    <HeroKpi icon={Waves} label="VOLATILITY" value={`${volatility.toFixed(1)} bps`} color="#f97316" delay={0.3} />
+                    <HeroKpi icon={ShieldCheck} label="BUY PRESSURE" value={`${(buyPressure * 100).toFixed(1)}%`} color={buyPressure > 0.5 ? '#10b981' : '#ef4444'} delay={0.35} />
+                </div>
             </div>
 
             {/* Charts Row 1 */}
