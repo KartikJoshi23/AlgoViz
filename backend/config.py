@@ -42,11 +42,12 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3002",
         "http://127.0.0.1:5173",
         # Production deployments
+        "https://algorithmic-viz.vercel.app",
         "https://algoviz.vercel.app",
         "https://algo-viz.vercel.app",
         "https://algoviz.netlify.app",
         "https://algo-viz.netlify.app",
-        "https://algoviz-5saw.onrender.com",
+        "https://algoviz-52q2.onrender.com",
     ]
 
     # ── Database ─────────────────────────────────────────────────────
