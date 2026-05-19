@@ -17,13 +17,13 @@ import { TrendingUp, TrendingDown, Activity, Zap, BarChart3, Gauge, Waves, Shiel
 
 /* ── Animated Ticker Tape ─────────────────────────────────────────── */
 function TickerTape() {
-    const { marketData, connected } = useStore();
-    const price = marketData?.price ?? 0;
-    const spread = marketData?.spread_bps ?? 0;
-    const velocity = marketData?.velocity ?? 0;
-    const imbalance = marketData?.imbalance ?? 0;
-    const buyPressure = marketData?.buy_pressure ?? 0.5;
-    const vwap = marketData?.vwap ?? 0;
+    const features = useStore((s) => s.features);
+    const price = features.current_price;
+    const spread = features.spread_bps;
+    const velocity = features.velocity;
+    const imbalance = features.imbalance;
+    const buyPressure = features.buy_pressure;
+    const vwap = features.vwap;
 
     const items = [
         { label: 'BTC/USDT', value: `$${price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#06b6d4', icon: '₿' },
@@ -94,16 +94,15 @@ function HeroKpi({ icon: Icon, label, value, change, color, delay = 0 }: {
 export function DashboardPage() {
     const connected = useStore((s) => s.connected);
     const features = useStore((s) => s.features);
-    const marketData = useStore((s) => s.marketData);
     const trades = useStore((s) => s.trades);
 
-    const price = marketData?.price ?? 0;
-    const spread = marketData?.spread_bps ?? 0;
-    const vwap = marketData?.vwap ?? 0;
-    const velocity = marketData?.velocity ?? 0;
-    const imbalance = marketData?.imbalance ?? 0;
-    const buyPressure = marketData?.buy_pressure ?? 0.5;
-    const volatility = marketData?.volatility_bps ?? 0;
+    const price = features.current_price;
+    const spread = features.spread_bps;
+    const vwap = features.vwap;
+    const velocity = features.velocity;
+    const imbalance = features.imbalance;
+    const buyPressure = features.buy_pressure;
+    const volatility = features.volatility_bps;
 
     const recent = trades.slice(-8).reverse();
 
@@ -138,7 +137,7 @@ export function DashboardPage() {
             {/* Hero KPI Row */}
             <div className="hero-kpi-grid">
                 <HeroKpi icon={TrendingUp} label="PRICE" value={`$${price.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
-                    change={marketData?.price_change_pct ? `${marketData.price_change_pct > 0 ? '+' : ''}${marketData.price_change_pct.toFixed(2)}%` : undefined}
+                    change={features.price_change_pct ? `${features.price_change_pct > 0 ? '+' : ''}${features.price_change_pct.toFixed(2)}%` : undefined}
                     color="#06b6d4" delay={0.05} />
                 <HeroKpi icon={Activity} label="SPREAD" value={`${spread.toFixed(1)} bps`} color="#8b5cf6" delay={0.1} />
                 <HeroKpi icon={Gauge} label="VWAP" value={`$${vwap.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} color="#f59e0b" delay={0.15} />
