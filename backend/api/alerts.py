@@ -17,7 +17,6 @@ from schemas.schemas import (
     AlertRuleCreate, AlertRuleUpdate, AlertRuleResponse,
     AlertHistoryResponse,
 )
-from core.auth import get_current_user
 
 router = APIRouter(prefix="/alerts", tags=["Alerts"])
 
@@ -32,13 +31,9 @@ async def _get_default_user(db: AsyncSession) -> User:
 # ── Alert Rules CRUD ─────────────────────────────────────────────
 
 @router.get("/rules", response_model=List[AlertRuleResponse])
-async def list_rules(
-    db: AsyncSession = Depends(get_db),
-    user: Optional[User] = Depends(get_current_user),
-):
+async def list_rules(db: AsyncSession = Depends(get_db)):
     """List all alert rules."""
-    if user is None:
-        user = await _get_default_user(db)
+    user = await _get_default_user(db)
     result = await db.execute(
         select(AlertRule)
         .where(AlertRule.user_id == user.id)
@@ -48,14 +43,9 @@ async def list_rules(
 
 
 @router.post("/rules", response_model=AlertRuleResponse, status_code=status.HTTP_201_CREATED)
-async def create_rule(
-    data: AlertRuleCreate,
-    db: AsyncSession = Depends(get_db),
-    user: Optional[User] = Depends(get_current_user),
-):
+async def create_rule(data: AlertRuleCreate, db: AsyncSession = Depends(get_db)):
     """Create a new alert rule."""
-    if user is None:
-        user = await _get_default_user(db)
+    user = await _get_default_user(db)
     rule = AlertRule(
         user_id=user.id,
         name=data.name,
@@ -70,7 +60,7 @@ async def create_rule(
         notify_email=data.notify_email,
     )
     db.add(rule)
-    await db.commit()
+    await db.flush()
     await db.refresh(rule)
     return rule
 
@@ -88,7 +78,7 @@ async def update_rule(
         raise HTTPException(status_code=404, detail="Alert rule not found")
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(rule, key, value)
-    await db.commit()
+    await db.flush()
     await db.refresh(rule)
     return rule
 
@@ -101,7 +91,6 @@ async def delete_rule(rule_id: int, db: AsyncSession = Depends(get_db)):
     if not rule:
         raise HTTPException(status_code=404, detail="Alert rule not found")
     await db.delete(rule)
-    await db.commit()
 
 
 # ── Alert History ─────────────────────────────────────────────────
@@ -129,7 +118,6 @@ async def acknowledge_alert(alert_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Alert not found")
     alert.acknowledged = True
     alert.acknowledged_at = datetime.utcnow()
-    await db.commit()
     return {"status": "acknowledged"}
 
 
@@ -143,5 +131,4 @@ async def acknowledge_all(db: AsyncSession = Depends(get_db)):
     for a in alerts:
         a.acknowledged = True
         a.acknowledged_at = datetime.utcnow()
-    await db.commit()
     return {"status": "acknowledged", "count": len(alerts)}

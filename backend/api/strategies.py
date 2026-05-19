@@ -8,7 +8,7 @@ CRUD endpoints for trading strategies and backtesting.
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from typing import Optional, List
+from typing import List
 
 from database import get_db
 from models.models import Strategy, BacktestResult, User
@@ -16,7 +16,6 @@ from schemas.schemas import (
     StrategyCreate, StrategyUpdate, StrategyResponse,
     BacktestRequest, BacktestResponse,
 )
-from core.auth import get_current_user
 
 router = APIRouter(prefix="/strategies", tags=["Strategies"])
 
@@ -35,7 +34,7 @@ async def _get_or_create_default_user(db: AsyncSession) -> User:
             is_admin=True,
         )
         db.add(user)
-        await db.commit()
+        await db.flush()  # flush, don't commit — let the session manager commit
         await db.refresh(user)
     return user
 
@@ -43,13 +42,9 @@ async def _get_or_create_default_user(db: AsyncSession) -> User:
 # ── CRUD ──────────────────────────────────────────────────────────
 
 @router.get("/", response_model=List[StrategyResponse])
-async def list_strategies(
-    db: AsyncSession = Depends(get_db),
-    user: Optional[User] = Depends(get_current_user),
-):
-    """List all strategies (for the current user or all in single-user mode)."""
-    if user is None:
-        user = await _get_or_create_default_user(db)
+async def list_strategies(db: AsyncSession = Depends(get_db)):
+    """List all strategies for the default user."""
+    user = await _get_or_create_default_user(db)
     result = await db.execute(
         select(Strategy).where(Strategy.user_id == user.id).order_by(Strategy.created_at.desc())
     )
@@ -57,14 +52,9 @@ async def list_strategies(
 
 
 @router.post("/", response_model=StrategyResponse, status_code=status.HTTP_201_CREATED)
-async def create_strategy(
-    data: StrategyCreate,
-    db: AsyncSession = Depends(get_db),
-    user: Optional[User] = Depends(get_current_user),
-):
+async def create_strategy(data: StrategyCreate, db: AsyncSession = Depends(get_db)):
     """Create a new strategy."""
-    if user is None:
-        user = await _get_or_create_default_user(db)
+    user = await _get_or_create_default_user(db)
     strategy = Strategy(
         user_id=user.id,
         name=data.name,
@@ -73,7 +63,7 @@ async def create_strategy(
         config=data.config,
     )
     db.add(strategy)
-    await db.commit()
+    await db.flush()
     await db.refresh(strategy)
     return strategy
 
@@ -101,7 +91,7 @@ async def update_strategy(
         raise HTTPException(status_code=404, detail="Strategy not found")
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(strategy, key, value)
-    await db.commit()
+    await db.flush()
     await db.refresh(strategy)
     return strategy
 
@@ -114,7 +104,6 @@ async def delete_strategy(strategy_id: int, db: AsyncSession = Depends(get_db)):
     if not strategy:
         raise HTTPException(status_code=404, detail="Strategy not found")
     await db.delete(strategy)
-    await db.commit()
 
 
 # ── Backtesting ───────────────────────────────────────────────────
@@ -142,7 +131,7 @@ async def run_backtest(
         final_capital=request.initial_capital,
     )
     db.add(backtest)
-    await db.commit()
+    await db.flush()
     await db.refresh(backtest)
     return backtest
 
