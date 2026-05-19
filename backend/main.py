@@ -78,7 +78,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── CORS ──────────────────────────────────────────────────────────
+# ── Production Middleware (added first = runs last) ───────────────
+from core.middleware import RequestIdMiddleware, TimingMiddleware, RateLimitMiddleware
+
+app.add_middleware(RequestIdMiddleware)
+app.add_middleware(TimingMiddleware)
+app.add_middleware(RateLimitMiddleware, requests_per_minute=120)
+
+# ── CORS (added last = runs FIRST in Starlette's middleware stack) ─
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -87,13 +94,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# ── Production Middleware ─────────────────────────────────────────
-from core.middleware import RequestIdMiddleware, TimingMiddleware, RateLimitMiddleware
-
-app.add_middleware(RequestIdMiddleware)
-app.add_middleware(TimingMiddleware)
-app.add_middleware(RateLimitMiddleware, requests_per_minute=120)
 
 
 # ── API Routes ────────────────────────────────────────────────────

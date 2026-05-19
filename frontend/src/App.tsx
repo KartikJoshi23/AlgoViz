@@ -1,13 +1,13 @@
 /**
  * AlgoViz — Main Application
  *
- * Root component with routing, WebSocket connection, layout,
- * command palette, and toast notifications.
+ * Root component with routing, WebSocket connection,
+ * top navbar layout, command palette, and toast notifications.
  */
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Sidebar } from './components/Sidebar';
+import { Navbar } from './components/Navbar';
 import { DashboardPage } from './pages/Dashboard';
 import { AnalyticsPage } from './pages/Analytics';
 import { StrategiesPage } from './pages/Strategies';
@@ -35,7 +35,7 @@ function AppContent() {
 
   return (
     <div className="app-layout">
-      <Sidebar />
+      <Navbar />
       <main className="main-content">
         <Routes>
           <Route path="/" element={<DashboardPage />} />
