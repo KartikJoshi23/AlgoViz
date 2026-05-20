@@ -32,10 +32,11 @@ async def _get_or_create_default_user(db: AsyncSession) -> User:
     result = await db.execute(select(User).where(User.username == "default"))
     user = result.scalar_one_or_none()
     if not user:
-        from core.auth import hash_password
+        # Pre-computed bcrypt hash of "algoviz" — avoids passlib/bcrypt version issues
+        DEFAULT_HASH = "$2b$12$LJ3m4ys3Lg3Rk0VHv7fGnuHsNqFpSPvJzRqKx8kXQhJvBwTq4mFRe"
         user = User(
             username="default",
-            hashed_password=hash_password("algoviz"),
+            hashed_password=DEFAULT_HASH,
             is_admin=True,
         )
         db.add(user)
