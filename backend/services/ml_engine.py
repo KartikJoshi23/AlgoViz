@@ -381,12 +381,21 @@ class MLEngine:
                 "tick_count": 0,
             })
 
-        # Check if retraining is needed
+        # Check if retraining is needed (run in background thread to avoid blocking event loop)
         if self.training_buffer.size >= settings.ML_MIN_DATA_POINTS and not self._model_trained:
-            self._train()
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+                loop.run_in_executor(None, self._train)
+            except RuntimeError:
+                self._train()
         elif self._model_trained and self.training_buffer.size >= self._training_count + 200:
-            # Retrain every 200 new samples
-            self._train()
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+                loop.run_in_executor(None, self._train)
+            except RuntimeError:
+                self._train()
 
     def _resolve_pending(self, current_price: float):
         """Label pending samples that have enough ticks elapsed."""
