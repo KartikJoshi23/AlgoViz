@@ -1,14 +1,14 @@
 # Generated from pyproject.toml - do not edit by hand.
 # Runtime dependencies only (Render / Docker). Dev tools: pip install -e .[dev]
 fastapi==0.141.1
-uvicorn[standard]==0.53.0
+uvicorn[standard]==0.54.0
 python-multipart==0.0.32
 orjson==3.12.0
 websockets==17.1
 httpx==0.28.1
 pydantic==2.13.5
 pydantic-settings==2.15.0
-sqlalchemy[asyncio]==2.0.54
+sqlalchemy[asyncio]==2.1.1
 aiosqlite==0.22.1
 asyncpg==0.31.0
 alembic==1.20.0
