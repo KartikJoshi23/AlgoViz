@@ -33,7 +33,7 @@ jobs:
       - run: mypy
       - name: pytest with coverage (floor in pyproject.toml)
         run: pytest -q --cov --cov-report=term --cov-report=xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: backend-coverage
@@ -102,7 +102,7 @@ jobs:
         env:
           CI: "1"
           ALGOVIZ_PYTHON: python
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report
