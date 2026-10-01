@@ -24,9 +24,21 @@ These rules come from the owner and still apply:
 ## Where it stands (2026-10-01)
 
 - **Phase 4 is complete:** stages G, J, K, L, H, M, plus the theme v3 overhaul. **Stage M awaits the owner's review.** If they approve, there is no further planned stage; ask what comes next.
-- **Git:** the whole rebuild (Phases 3 and 4) is committed on branch `overhaul/phase-3-4` and pushed. `main` still holds the old pre-rebuild app.
-  - **Merging into `main` deploys:** `render.yaml` has `autoDeploy: true`, and Vercel builds from `main`. Only merge when the owner says so.
-  - Production then needs `SECRET_KEY` and `ADMIN_TOKEN` (`render.yaml` generates both) and a Postgres `DATABASE_URL`.
+- **Git:** the whole rebuild (Phases 3 and 4) is on `main`, pushed 2026-10-01 at the owner's request as a fast-forward. `overhaul/phase-3-4` is the merged branch and can be deleted.
+  - **Every push to `main` deploys:** `render.yaml` has `autoDeploy: true`, and Vercel builds from `main`.
+  - CI (`.github/workflows/ci.yml`) runs on pushes to `main` and on pull requests.
+  - The deploy outcome of 2026-10-01 was not verified from here (no Render or Vercel access): ask the owner how it went.
+- **Production checklist** (what the rebuild needs from the hosts):
+  - **Render (backend):**
+    - `ENVIRONMENT=production`, `SECRET_KEY`, and an `ADMIN_TOKEN` of ≥ 32 characters. Without `ADMIN_TOKEN` the app refuses to start, and Render keeps the previous deploy serving.
+    - `TRUSTED_PROXIES` set to Render's private ranges.
+    - A Postgres `DATABASE_URL`, because the disk is ephemeral.
+    - A Blueprint-managed service picks all of these up from `render.yaml`; a hand-made one needs them set in the dashboard.
+  - **Vercel (frontend):**
+    - Framework preset **Next.js**, root directory `frontend`. The old project was Vite, and `frontend/vercel.json` is gone.
+    - `NEXT_PUBLIC_API_URL=https://<backend>` and `NEXT_PUBLIC_WS_URL=wss://<backend>/ws`, set before the build.
+    - The frontend's origin must be in the backend's `CORS_ORIGINS` (the defaults list the old `*.vercel.app` names).
+  - Then paste the `ADMIN_TOKEN` into the frontend's Settings → Access to make changes.
 - **Open items the owner must clear** (they need permission):
   - Linux visual baselines. These need the `mcr.microsoft.com/playwright` Docker image (~2 GB); CI skips the visual spec off Windows meanwhile.
   - A migration run against a real Postgres (Docker image). The DDL was only verified offline.
