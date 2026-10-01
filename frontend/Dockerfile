@@ -7,13 +7,13 @@
 #                --build-arg NEXT_PUBLIC_WS_URL=wss://api.example.com/ws -t algoviz-web .
 
 # ── Dependencies ─────────────────────────────────────────────────────
-FROM node:22-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 
 # ── Build ────────────────────────────────────────────────────────────
-FROM node:22-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000
 ARG NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws
@@ -25,7 +25,7 @@ COPY . .
 RUN npm run build
 
 # ── Runtime ──────────────────────────────────────────────────────────
-FROM node:22-alpine AS runtime
+FROM node:26-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
 RUN addgroup -S app && adduser -S app -G app
