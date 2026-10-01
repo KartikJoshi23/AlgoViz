@@ -2,7 +2,7 @@
 # AlgoViz backend — multi-stage build, non-root, production CMD.
 
 # ── Builder: compile wheels into a venv ─────────────────────────────
-FROM python:3.11-slim AS builder
+FROM python:3.14-slim AS builder
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential \
     && rm -rf /var/lib/apt/lists/*
@@ -13,7 +13,7 @@ COPY requirements.txt .
 RUN pip install --upgrade pip setuptools wheel && pip install -r requirements.txt
 
 # ── Runtime ─────────────────────────────────────────────────────────
-FROM python:3.11-slim AS runtime
+FROM python:3.14-slim AS runtime
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PATH="/opt/venv/bin:$PATH"
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
