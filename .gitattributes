@@ -1,0 +1,12 @@
+# Normalise line endings: LF in the repository and in every working tree, so
+# formatters, hashes and the committed OpenAPI document agree across platforms.
+* text=auto eol=lf
+
+# Binary files are stored and checked out byte for byte.
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary
+*.gz binary
+*.joblib binary
+*.db binary

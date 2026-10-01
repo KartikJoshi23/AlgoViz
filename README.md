@@ -1,14 +1,16 @@
 <div align="center">
 
-# ⚡ AlgoViz
+# AlgoViz
 
-### Professional-Grade Algorithmic Trading Intelligence Platform
+### Real-time market-microstructure intelligence
 
-Real-time market data streaming · ML-powered predictions · On-chain analytics
+L2 order book · order-flow imbalance · regime detection · calibrated next-move probabilities · signals · alerts · event-driven backtests — rendered as a liquidity terrain you can orbit.
 
+[![CI](https://github.com/KartikJoshi23/AlgoViz/actions/workflows/ci.yml/badge.svg)](https://github.com/KartikJoshi23/AlgoViz/actions/workflows/ci.yml)
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://typescriptlang.org)
+[![Three.js](https://img.shields.io/badge/Three.js-r186-000000?logo=threedotjs&logoColor=white)](https://threejs.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.141-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
@@ -16,266 +18,224 @@ Real-time market data streaming · ML-powered predictions · On-chain analytics
 
 ---
 
-## 🎯 Overview
+## What it does
 
-AlgoViz is a full-stack, production-grade trading intelligence dashboard that streams real-time market data from Binance, computes technical features on-the-fly, runs ML predictions for price direction, and presents everything through a professional dark-mode terminal UI.
+AlgoViz consumes the Binance trade and diff-depth streams for a symbol, rebuilds the full L2 order book, and turns the raw event flow into a small set of honest, well-defined numbers a trader can act on — every 200 ms, in the browser:
 
-> **Not a toy project.** This is a complete trading intelligence platform with a real ML pipeline (scikit-learn ensemble), WebSocket data streaming, rate-limited API, and deployment-ready infrastructure.
-
----
-
-## ✨ Features
-
-| Category | Features |
+| Layer | What you get |
 |---|---|
-| **Real-Time Data** | Binance WebSocket streaming, VWAP/TWAP, spread, velocity, imbalance, volatility |
-| **Dashboard** | MarketPulse animated hero, TradingView price chart, order book depth, velocity gauge, spread heatmap, volatility monitor |
-| **ML Engine** | RandomForest + GradientBoosting ensemble, SHAP explainability, online retraining, model persistence |
-| **Strategies** | Create/manage rule-based strategies, backtest with historical data |
-| **Alerts** | Priority-based alert system with toast notifications and Discord webhook support |
-| **On-Chain** | Placeholder for Foundry-based Ethereum analytics (whale tracking, DEX analysis) |
-| **UX** | Command palette (Ctrl+K), dark/light theme, keyboard navigation, glassmorphism UI |
-| **Production** | Rate limiting, request correlation IDs, response timing, health checks, Docker support |
+| **Order book** | Full L2 reconstruction with `U/u` sequencing and automatic resync; microprice, weighted queue imbalance, liquidity within 5/10/25 bps, book slopes, a 128-bin cumulative **depth profile** streamed at 5 Hz |
+| **Order flow** | Cont–Kukanov–Stoikov OFI over 1 s / 5 s / 30 s, trade velocity, buy pressure, VWAP/TWAP, volatility — all in event time, O(1) per event |
+| **Baselines** | EWMA mean/variance per feature → z-scores with warm-up guards, so "unusual" means *unusual for the last 15 minutes*, not a hard-coded threshold |
+| **Regime** | Two separate axes: a **volatility state** from a Gaussian HMM over 1-second bars (calm / normal / elevated / extreme, with min-dwell hysteresis) and a **trend** (down / flat / up) that is called only while the drift's Newey–West t-statistic clears ±2 |
+| **Model** | Triple-barrier, volatility-scaled labels; 46 scale-free features (quantities over their rolling 30-minute medians); gradient boosting early-stopped on a time-ordered tail and calibrated on embargoed time splits. **Evaluated as served**: every walk-forward fold (`TimeSeriesSplit(gap = horizon)`) runs the same recipe and is scored held-out — log-loss, reliability curve, Brier reliability / resolution / uncertainty — against the class prior and a regularised logistic baseline. Held-out permutation importance on log-loss; SHAP of the served ensemble; a manifest check refuses models trained for other features or labels; live **drift monitor** that scores every prediction against what the market did |
+| **Signals** | 18 rules with hysteresis, minimum duration and cooldown, expressed in one condition language shared with alerts and strategies |
+| **Alerts** | Threshold rules on any catalog feature, evaluated every second, history + acknowledgement, Discord delivery |
+| **Backtests** | Declarative strategies (entries, exits, stops, targets, max hold, cooldown, model probabilities) run event-by-event on real 1-second bars with next-bar fills, slippage and commission |
+
+The frontend is a Next.js app with a WebGL **liquidity terrain** (price × time × cumulative depth, displaced in a vertex shader from the depth ring), trade-flow particles, and a regime-driven ambient field behind glass panels — all of which pause when off-screen and degrade to 2D when WebGL is unavailable.
+
+Everything runs offline too: a structurally honest **synthetic exchange** (GBM with a sticky volatility chain, Hawkes-style trades, a mean-reverting book with far-liquidity walls) and a **replay** mode for recorded streams drive the same pipeline.
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
-┌─────────────────────────┐      WebSocket       ┌──────────────────────────┐
-│     Frontend (Vercel)    │◄────────────────────►│    Backend (Render)       │
-│                          │      REST API        │                          │
-│  React 19 + Vite         │◄────────────────────►│  FastAPI + SQLAlchemy     │
-│  Zustand + TanStack      │                      │  scikit-learn + SHAP      │
-│  TradingView Charts      │                      │  Binance WebSocket        │
-│  Framer Motion           │                      │  Rate Limiter + Logging   │
-└─────────────────────────┘                      └──────────────────────────┘
-                                                          │
-                                                          ▼
-                                                  ┌──────────────┐
-                                                  │   Binance     │
-                                                  │   WebSocket   │
-                                                  │   (Live Data) │
-                                                  └──────────────┘
+                 Binance WS (trades, diff-depth)            recorded NDJSON            synthetic exchange
+                              │                                    │                          │
+                              └────────────────── MarketSource ────┴──────────────────────────┘
+                                                        │
+      ┌─────────────────────────────────────────────────┼──────────────────────────────────────────┐
+      │  SymbolEngine (per symbol, single asyncio task)  │                                          │
+      │   L2 book ──► book metrics (5 Hz)                ▼                                          │
+      │   rolling windows ──► FeatureSnapshot ──► EWMA baselines ──► z-scores                       │
+      │   1-second bars ──► HMM regime ──► ML engine (labels, train, predict, drift)                │
+      │                 └──► signal engine ──► alert evaluator ──► Discord                           │
+      │   persistence: bars, predictions, alerts, strategies, backtests (SQLite / Postgres, Alembic) │
+      └───────────────────────────────┬───────────────────────────────────┬────────────────────────┘
+                                      │ typed WS frames (channels,        │ REST (OpenAPI → generated TS types)
+                                      │ snapshot-on-connect, backpressure) │
+                              ┌───────▼───────────────────────────────────▼────────┐
+                              │  Next.js 16 · React 19 · zustand rings · TanStack  │
+                              │  canvas heatmap · Three.js terrain · GSAP          │
+                              └────────────────────────────────────────────────────┘
 ```
+
+- **Backend** — FastAPI 0.141 · Python 3.11 · SQLAlchemy 2 (async) + Alembic · numpy/scipy/scikit-learn/shap/hmmlearn · orjson · pure-ASGI middleware (request IDs, timing, rate limiting) · bcrypt + PyJWT · prometheus-client. Why it is built this way: [ARCHITECTURE.md](./ARCHITECTURE.md).
+- **Frontend** — Next.js 16 (App Router, standalone output) · React 19 · TypeScript strict · Tailwind CSS 4 (CSS-first tokens) · zustand 5 with typed-array ring buffers · TanStack Query 5 · `openapi-typescript` + `openapi-fetch` · Three.js + React Three Fiber · GSAP · lightweight-charts.
+- **Contracts** — `backend/scripts/export_openapi.py` writes `frontend/lib/api/openapi.json`; `npm run types` generates `lib/api/schema.d.ts`. CI fails if either is stale. The WebSocket frame types come from the same document (`/api/v1/ws/schema`).
 
 ---
 
-## 🚀 Quick Start
+## Quick start
 
 ### Prerequisites
 
-- **Node.js** ≥ 18 and **npm**
-- **Python** ≥ 3.11
-- **Git**
+Python ≥ 3.11 · Node.js ≥ 20.9 · npm — or Docker.
 
-### 1. Clone
+### One command (Docker)
 
 ```bash
-git clone https://github.com/KartikJoshi23/AlgoViz.git
-cd AlgoViz
+docker compose up --build                        # live Binance feed
+DATA_SOURCE=synthetic docker compose up --build  # no internet needed
 ```
 
-### 2. Backend Setup
+Frontend → http://localhost:3002 · Backend → http://localhost:8002 (`/docs` for the API).
+
+### Two terminals (development)
 
 ```bash
+# backend
 cd backend
-python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# macOS/Linux
-source .venv/bin/activate
-
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
+uvicorn algoviz.main:app --reload --port 8000        # DATA_SOURCE=synthetic for offline
 ```
 
-The API is now live at `http://localhost:8000` with docs at `/docs`.
-
-### 3. Frontend Setup
-
 ```bash
+# frontend
 cd frontend
 npm install
-npm run dev
+cp .env.example .env.local                           # backend origin, defaults to localhost:8000
+npm run dev                                          # http://localhost:3000
 ```
 
-Open `http://localhost:3002` — the dashboard connects to the backend automatically via the dev proxy.
+### Data sources
 
-### 4. Docker (Alternative)
-
-```bash
-docker-compose up --build
-# Backend → localhost:8001
-# Frontend → localhost:3001
-```
-
----
-
-## 🌐 Deployment
-
-### Frontend → Vercel
-
-1. Import repo on [Vercel](https://vercel.com)
-2. Set **Root Directory** to `frontend`
-3. Set **Framework Preset** to `Vite`
-4. Add environment variable:
-   ```
-   VITE_API_URL = https://your-backend.onrender.com
-   ```
-5. Deploy
-
-### Backend → Render
-
-1. Create a new **Web Service** on [Render](https://render.com)
-2. Connect GitHub repo
-3. Set **Root Directory** to `backend`
-4. Set **Build Command**: `pip install -r requirements.txt`
-5. Set **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-6. Set environment variables:
-   ```
-   ENVIRONMENT = production
-   DEBUG = false
-   SECRET_KEY = <generate-a-strong-key>
-   ```
-7. Deploy — Render auto-detects the `render.yaml`
-
-> **Important:** After deploying the backend, update the `VITE_API_URL` environment variable on Vercel to point to your Render URL.
-
----
-
-## 📁 Project Structure
-
-```
-AlgoViz/
-├── backend/                    # FastAPI backend
-│   ├── api/                    # REST API routers
-│   │   ├── analytics.py        # ML predictions, SHAP, insights
-│   │   ├── alerts.py           # Alert management
-│   │   ├── auth.py             # JWT authentication
-│   │   ├── market.py           # Market data endpoints
-│   │   └── strategies.py       # Strategy CRUD + backtesting
-│   ├── core/                   # Middleware & utilities
-│   │   └── middleware.py       # Rate limit, timing, request IDs
-│   ├── models/                 # SQLAlchemy ORM models
-│   ├── services/               # Business logic
-│   │   ├── market_data.py      # Binance WS, feature engine
-│   │   └── ml_engine.py        # Ensemble ML pipeline + SHAP
-│   ├── ws/                     # WebSocket hub
-│   ├── config.py               # Pydantic settings
-│   ├── database.py             # SQLAlchemy async setup
-│   ├── main.py                 # FastAPI app entry point
-│   └── requirements.txt        # Python dependencies
-│
-├── frontend/                   # React SPA
-│   ├── src/
-│   │   ├── components/         # Reusable UI components
-│   │   │   ├── MarketPulse.tsx  # Animated market heartbeat hero
-│   │   │   ├── PriceChart.tsx   # TradingView lightweight chart
-│   │   │   ├── OrderBookChart   # Depth visualization
-│   │   │   ├── VelocityGauge   # Radial speedometer
-│   │   │   ├── SpreadHeatmap   # Canvas heatmap
-│   │   │   ├── VolatilityChart # Area chart with regimes
-│   │   │   ├── CommandPalette  # Ctrl+K power-user palette
-│   │   │   ├── ToastProvider   # Notification system
-│   │   │   └── ...
-│   │   ├── pages/              # Route pages
-│   │   │   ├── Dashboard.tsx    # Main trading dashboard
-│   │   │   ├── Analytics.tsx    # ML predictions & SHAP
-│   │   │   ├── Strategies.tsx   # Strategy management
-│   │   │   ├── Alerts.tsx       # Alert history
-│   │   │   ├── OnChain.tsx      # On-chain analytics (planned)
-│   │   │   └── Settings.tsx     # Preferences & theme
-│   │   ├── hooks/              # Custom React hooks
-│   │   ├── store.ts            # Zustand global state
-│   │   ├── api.ts              # Axios client
-│   │   └── App.tsx             # Root component
-│   ├── vercel.json             # Vercel SPA config
-│   └── package.json
-│
-├── tests/                      # Test suites
-├── docker-compose.yml          # Docker dev setup
-├── render.yaml                 # Render deployment config
-├── .env.example                # Environment template
-└── README.md
-```
-
----
-
-## 🛠️ Tech Stack
-
-| Layer | Technology |
+| `DATA_SOURCE` | Behaviour |
 |---|---|
-| **Frontend** | React 19, Vite 7, TypeScript 5.9 |
-| **State Management** | Zustand, TanStack Query |
-| **Charts** | TradingView Lightweight Charts, Canvas API |
-| **Animations** | Framer Motion |
-| **Styling** | Custom CSS design system (glassmorphism dark theme) |
-| **Backend** | FastAPI, SQLAlchemy (async), SQLite |
-| **ML/AI** | scikit-learn (RandomForest + GradientBoosting), SHAP |
-| **Real-Time** | WebSocket (Binance streams → FastAPI hub → React) |
-| **Auth** | JWT (python-jose) |
-| **Deployment** | Vercel (frontend), Render (backend), Docker |
+| `live` (default) | Binance `@trade` + `@depth@100ms`, REST snapshot with diff bracketing; falls back across hosts on HTTP 451 |
+| `replay` | `REPLAY_FILE=path.ndjson.gz` through the same pipeline at `REPLAY_SPEED` (0 = as fast as possible). Record with `python scripts/record_stream.py --seconds 120 --out data/recordings/btc.ndjson.gz` |
+| `synthetic` | Built-in exchange simulator — deterministic per seed, regimes and breakouts included |
+
+Symbols: `SYMBOLS=["BTCUSDT"]` (allowlist: BTCUSDT, ETHUSDT, SOLUSDT). Synthetic and replay runs use their own database and model store (`data/algoviz-<source>.db`, `ml_models/<source>/`) so simulator bars never train the live model. All settings are in [`.env.example`](.env.example).
 
 ---
 
-## 📸 Screenshots
+## The frontend
 
-> Screenshots are auto-generated from the running application.
-
-| Dashboard | Analytics |
+| Route | Content |
 |---|---|
-| MarketPulse hero, live price chart, order book, velocity gauge, spread heatmap | ML predictions, SHAP feature importance, model info |
+| `/` | KPI strip (z-annotated), liquidity heatmap (3D terrain on request), mid/VWAP/microprice chart, model panel, volatility state and trend, cumulative depth, order-flow strips, signals feed, trade tape, session z-scores |
+| `/book` | Full-width liquidity heatmap / terrain with hover readout, cumulative depth curve, ladder, liquidity bands and slopes, OFI / imbalance / spread strips |
+| `/intelligence` | Calibrated probabilities, drift monitor (rolling hit rate and log-loss vs prior), SHAP contributions, held-out permutation importance, walk-forward folds with held-out reliability and the Brier decomposition, model registry, signal rules with live state |
+| `/strategies` | Condition editor over the feature catalog, templates, backtest runner with WebSocket progress, equity/drawdown chart, trade list |
+| `/alerts` | Rule CRUD, live + persisted history, acknowledge, Discord |
+| `/settings` | Symbol, book stream, performance tier, motion, ambient tint, connection, access (admin token), engine metrics |
 
-| Strategies | Settings |
-|---|---|
-| Create & backtest trading strategies | Theme toggle, connection status, preferences |
+⌘/Ctrl-K opens the command palette. Preferences live in `localStorage` and sync across tabs. Motion respects `prefers-reduced-motion`; software renderers get the low tier automatically (2D hero, no glass blur, no looping ambient motion).
+
+### Visual identity — "Depth"
+
+A navy "midnight glass" theme. Colour carries meaning only: bids teal, asks crimson and the mid gold — the order book's own semantics, checked with colour-vision-deficiency simulation to stay distinguishable. The volatility state is a single violet lightness ramp (calm → extreme), which also tints the slow aurora behind the page. Status colours are reserved for state and always come with a label. All text meets WCAG AA.
 
 ---
 
-## 📄 API Documentation
+## API
 
-Once the backend is running, interactive API docs are available at:
-
-- **Swagger UI**: `http://localhost:8000/docs`
-- **ReDoc**: `http://localhost:8000/redoc`
-- **Health Check**: `http://localhost:8000/health`
-
-### Key Endpoints
+Interactive docs at `/docs` (Swagger) and `/redoc`. Highlights:
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/health` | Service health + uptime |
-| `GET` | `/api/v1/market/features` | Current computed features |
-| `GET` | `/api/v1/analytics/prediction` | ML price direction prediction |
-| `GET` | `/api/v1/analytics/insights` | Active trading insights |
-| `GET` | `/api/v1/analytics/model-info` | ML model status & metrics |
-| `GET` | `/api/v1/strategies/` | List all strategies |
-| `POST` | `/api/v1/strategies/` | Create a new strategy |
-| `WS` | `/ws` | Real-time data stream |
+| `GET` | `/health` · `/health/live` · `/health/ready` | Summary (always 200, `ok`/`degraded`); liveness probe; readiness probe — 503 until the schema is migrated, every book is synced and fresh, and event-loop lag p99 is under `LOOP_LAG_DEGRADED_MS` |
+| `GET` | `/api/v1/market/features` · `/book` · `/trades` · `/bars` | Current features, L2 book + depth profile, tape, 1-second bars (ring or history) |
+| `GET` | `/api/v1/market/feature-catalog` | The one list of features the condition language accepts |
+| `GET` | `/api/v1/analytics/prediction` · `/model-info` · `/shap` · `/drift` · `/model-registry` | Model state, walk-forward metrics, explanations, live drift, training history |
+| `GET` | `/api/v1/analytics/signals` · `/signals/rules` | Active signals, recent transitions, rule definitions |
+| `CRUD` | `/api/v1/strategies` · `POST …/{id}/backtest` · `GET …/{id}/backtests/{bid}` | Strategies, asynchronous backtests, results with equity curve and trades |
+| `CRUD` | `/api/v1/alerts/rules` · `/api/v1/alerts/history` | Alert rules and history with acknowledgement |
+| `GET` | `/api/v1/system/metrics` · `/metrics` | Engine, writer, alert evaluator and WebSocket statistics (JSON for the UI; Prometheus text for scrapers) |
+| `POST` `GET` | `/api/v1/auth/login` · `/auth/access` | JWT login; whether changes are gated here and whether the caller may make them |
+| `WS` | `/ws?symbol=BTCUSDT` | Channels: `features` `book` `trades` `bars` `regime` `prediction` `signals` `alerts` `backtests` `status`; `hello` + `snapshot` on connect; per-client latest-wins queues for high-rate channels |
+
+Reads are public. Changes (every `POST` / `PATCH` / `DELETE` above) need `Authorization: Bearer <ADMIN_TOKEN>` or a user's JWT when `MUTATIONS_REQUIRE_AUTH` is on (production by default). Errors are RFC 9457 `application/problem+json` (`title`, `status`, `detail`, `request_id`, per-field `errors`). History lists are paged newest first: pass `next_before` back as `before`.
+
+### Condition language
+
+Shared by signal rules, alert rules and strategies, validated against the feature catalog:
+
+```json
+{"all": [{"f": "ofi_z", "op": ">", "v": 1.5}, {"f": "regime", "op": "not_in", "v": ["calm"]}]}
+```
+
+Leaves are `{"f", "op", "v"}`; groups are `all` / `any` / `not`. Missing values make a leaf false, never an error, so rules stay quiet during warm-up.
 
 ---
 
-## 🤝 Contributing
+## Honesty notes
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+- Model metrics are **walk-forward and evaluated as served**. Each fold is built with the same recipe as the live model (time-tail early stopping, calibration on embargoed splits), inside `TimeSeriesSplit` with an embargo equal to the label horizon. It is scored held-out against the class prior and a regularised logistic baseline, with reliability curves and the Brier decomposition. "Edge" means beating the prior out of sample. On live BTC at a 5 s horizon it does not, and the UI says so.
+- Feature importance is the rise in held-out log-loss when a feature is shuffled. SHAP explains the served ensemble's tree models before calibration, and is labelled as such.
+- The drift monitor scores live predictions against realised moves; the registry keeps every training run.
+- Backtests fill at the next bar's close with slippage and commission, check stops and targets against the extremes of the bars *after* the fill, and are labelled `synthetic` when fewer than `BACKTEST_MIN_BARS` real bars were available. Sharpe/Sortino are annualised from 1-minute returns over a short window — treat them as indicative.
+
+---
+
+## Development
+
+With [`just`](https://just.systems): `just setup`, then `just check` runs every CI gate, and `just --list` shows the rest (backend, frontend, e2e, contracts, format, docker). Without it:
+
+```bash
+# backend gate (what CI runs)
+cd backend && ruff check . && ruff format --check . && mypy
+pytest -q --cov                       # coverage floor 90 % (pyproject.toml); -m "not slow" skips the ML integration test
+pip-audit -r requirements.txt --strict
+
+# frontend gate
+cd frontend && npm run format:check && npm run check    # prettier · tsc · eslint · vitest · next build
+npm run e2e                           # Playwright: seeds the e2e DB, builds the app, boots a synthetic backend
+
+# contracts
+python backend/scripts/export_openapi.py && (cd frontend && npm run types)
+```
+
+The Playwright suite covers smoke and page flows, strategies and alerts, WCAG 2.2 AA (axe), visual baselines (recorded on Windows), performance budgets on the non-3D routes, and a WebGL project forcing the mid tier. Every run starts from the same seeded database and trained model (`backend/scripts/seed_e2e.py`). Hooks: `pip install pre-commit && pre-commit install` runs ruff, prettier and eslint with the project's own pinned versions.
+
+Migrations: `cd backend && alembic upgrade head` (run automatically at startup). Record a stream for replay: `python backend/scripts/record_stream.py --seconds 120`.
+
+### Project structure
+
+```
+backend/
+  algoviz/
+    market/      sources (binance, replay, synthetic), book, features, baselines, bars, regime, catalog, persistence, service
+    ml/          features, labels, train, evaluation, registry, explain, drift, engine
+    signals/     rules, engine            alerts/   notify, evaluator
+    backtest/    strategy, engine, metrics, service
+    api/         market, analytics, strategies, alerts, auth, system     ws/  hub
+    core/        time, logging, auth, middleware, problems, metrics, workers, looplag, users, conditions
+    schemas/     rest, ws                  db/  session, migrations, types  models/
+  alembic/  scripts/ (export_openapi, record_stream, seed_e2e)  tests/  Dockerfile  pyproject.toml
+frontend/
+  app/           routes (/, /book, /intelligence, /strategies, /alerts, /settings), globals.css (tokens), ds.css (components)
+  components/    ds (design system), panels, charts, three (Terrain, shaders), conditions, strategies, alerts, intelligence, ui
+  lib/           api (generated types + hooks), ws (client, types), store (rings, heat, depth), gsap, perf, theme, features, reliability, format
+  e2e/  tests/   Playwright · Vitest       Dockerfile  next.config.ts  playwright.config.ts
+docker-compose.yml  render.yaml  justfile  .pre-commit-config.yaml  .github/ (ci.yml, dependabot.yml)
+ARCHITECTURE.md  CHANGELOG.md  CLAUDE.md (hand-off notes)  docs/implementation-plan.md (plan + delivery log)
+```
 
 ---
 
-## 📝 License
+## Deployment
 
-This project is licensed under the MIT License — see the [LICENSE](./LICENSE) file for details.
+- **Backend → Render** — `render.yaml` provisions a Python web service in Singapore (Binance returns 451 to US IPs). It generates `SECRET_KEY` and `ADMIN_TOKEN`, trusts forwarded addresses only from Render's private proxy ranges, and health-checks `/health/live`.
+  - Render's disk is ephemeral, so set `DATABASE_URL` to a Postgres instance (`postgres://…` URLs are accepted and use asyncpg); migrations run at startup.
+  - Paste the generated `ADMIN_TOKEN` into the frontend's Settings → Access to make changes.
+  - Add `DISCORD_WEBHOOK_URL` if you want alert deliveries.
+  - Scrape `/metrics` with Prometheus if you run one.
+- **Frontend → Vercel** — import the repo with **Root Directory** `frontend`, framework Next.js, and set `NEXT_PUBLIC_API_URL=https://<backend>.onrender.com` and `NEXT_PUBLIC_WS_URL=wss://<backend>.onrender.com/ws`. Add the frontend's origin to the backend's `CORS_ORIGINS` (the WebSocket allowlist follows it); for preview deployments, set a narrow `CORS_ORIGIN_REGEX`.
+- **Anywhere → Docker** — both images are multi-stage and non-root; the frontend image takes the browser-facing backend origin as build args (see `docker-compose.yml`).
 
 ---
+
+## License
+
+MIT — see [LICENSE](./LICENSE).
 
 <div align="center">
 
-**Built with ❤️ by [Kartik Joshi](https://github.com/KartikJoshi23)**
-
-⭐ Star this repo if you find it useful!
+Built by [Kartik Joshi](https://github.com/KartikJoshi23)
 
 </div>

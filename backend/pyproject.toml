@@ -1,0 +1,120 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "algoviz"
+version = "3.0.0"
+description = "Real-time market-microstructure intelligence platform — streaming feature engine, L2 order book, calibrated ML, signals, alerts, backtesting."
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "Kartik Joshi" }]
+
+# Exact pins: this is an application, not a library. Newest releases that
+# still publish Python 3.11 wheels (numpy/scipy/shap ≥ next minor need 3.12).
+dependencies = [
+    # Web
+    "fastapi==0.141.1",
+    "uvicorn[standard]==0.53.0",
+    "python-multipart==0.0.32",
+    "orjson==3.12.0",
+    "websockets==17.1",
+    "httpx==0.28.1",
+    # Data / settings
+    "pydantic==2.13.5",
+    "pydantic-settings==2.15.0",
+    # Persistence
+    "sqlalchemy[asyncio]==2.0.54",
+    "aiosqlite==0.22.1",
+    "asyncpg==0.31.0",  # Postgres via DATABASE_URL for hosted deployments (D5)
+    "alembic==1.20.0",
+    # Auth
+    "bcrypt==5.0.0",
+    "PyJWT==2.15.0",
+    # Observability
+    "prometheus-client==0.26.0",
+    # Numerics / ML
+    "numpy==2.4.6",
+    "scipy==1.17.1",
+    "scikit-learn==1.9.1",
+    "joblib==1.6.0",
+    "shap==0.51.0",
+    "hmmlearn==0.3.3",
+    "sortedcontainers==2.4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "pytest-cov==7.1.0",
+    "hypothesis==6.168.3",
+    "ruff==0.16.8",
+    "mypy==2.3.1",
+    "pip-audit==2.10.1",
+]
+
+[tool.setuptools.packages.find]
+include = ["algoviz*"]
+
+# ── Ruff ─────────────────────────────────────────────────────────────
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",      # pycodestyle / pyflakes
+    "I",                # isort
+    "UP",               # pyupgrade
+    "B",                # bugbear
+    "ASYNC",            # async pitfalls
+    "DTZ",              # naive datetimes
+    "RUF",
+]
+ignore = [
+    "E501",             # line length handled by formatter
+    "B008",             # FastAPI Depends() in defaults
+    "RUF012",           # mutable class attrs (pydantic / sqlalchemy patterns)
+]
+
+# Typographic characters used deliberately in docstrings, comments and catalog units.
+allowed-confusables = ["−", "–", "σ", "α", "τ", "Δ", "…", "→", "⇒", "≥", "≤", "·", "×", "±"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["algoviz"]
+
+# ── Mypy ─────────────────────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.11"
+packages = ["algoviz"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs = true
+ignore_missing_imports = true
+plugins = ["pydantic.mypy"]
+
+# ── Pytest ───────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+markers = ["slow: long-running integration tests (run in CI; skip locally with -m 'not slow')"]
+filterwarnings = [
+    "error::DeprecationWarning:algoviz",
+]
+
+# ── Coverage (CI: pytest --cov) ──────────────────────────────────────
+[tool.coverage.run]
+source = ["algoviz"]
+# SQLAlchemy's asyncio layer runs the ORM inside greenlets; without this the
+# lines after each awaited query are not traced.
+concurrency = ["thread", "greenlet"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = false
+skip_covered = true

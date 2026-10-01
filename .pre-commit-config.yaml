@@ -1,0 +1,30 @@
+# pre-commit hooks — the same pinned tools CI runs, from the project's own environments.
+#   pip install pre-commit && pre-commit install
+# Local hooks on purpose: ruff comes from the backend's dev dependencies and eslint /
+# prettier from frontend/node_modules, so a hook can never disagree with CI's versions.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check (backend)
+        entry: bash -c 'cd backend && ruff check --fix .'
+        language: system
+        files: ^backend/.*\.py$
+        pass_filenames: false
+      - id: ruff-format
+        name: ruff format (backend)
+        entry: bash -c 'cd backend && ruff format .'
+        language: system
+        files: ^backend/.*\.py$
+        pass_filenames: false
+      - id: prettier
+        name: prettier (frontend)
+        entry: bash -c 'cd frontend && npx prettier --write --ignore-unknown "${@#frontend/}"' --
+        language: system
+        files: ^frontend/
+        exclude: ^frontend/(lib/api/(schema\.d\.ts|openapi\.json)|e2e/visual\.spec\.ts-snapshots/)
+      - id: eslint
+        name: eslint (frontend)
+        entry: bash -c 'cd frontend && npx eslint --max-warnings 0 "${@#frontend/}"' --
+        language: system
+        files: ^frontend/.*\.(ts|tsx|mjs)$

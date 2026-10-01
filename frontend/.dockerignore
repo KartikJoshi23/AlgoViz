@@ -1,0 +1,17 @@
+node_modules
+.next
+out
+coverage
+e2e
+tests
+test-results
+playwright-report
+playwright.config.ts
+vitest.config.ts
+vitest.setup.ts
+*.tsbuildinfo
+.env*
+!.env.example
+Dockerfile
+.dockerignore
+*.md

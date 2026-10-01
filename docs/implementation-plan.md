@@ -1,0 +1,997 @@
+# AlgoViz — Overhaul Implementation Plan
+
+> **Status:** approved (revision 2, post-audit). Development proceeds stage by stage per §7. Stages A–F delivered (§9). **Phase 4 (§10) approved 2026-09-24 with all recommendations (D1–D6); Stages G, J, K, L, H and M delivered, plus the theme v3 overhaul (§10.6): Phase 4 is complete, Stage M awaiting review.**
+> **Scope:** complete overhaul of `AlgoViz-Professional/` — core algorithmic engine, backend architecture, and a full frontend rebuild on Next.js + React + Three.js/WebGL + GSAP with a glassmorphism dark theme tied to the product's purpose.
+> **Supersedes:** `implementation_plan.md.resolved` (the stale plan from the earlier Streamlit → FastAPI/React migration).
+
+---
+
+## 0. Executive summary
+
+AlgoViz is a real-time **market-microstructure intelligence** platform for BTC/USDT. Today it has a correct-but-naïve feature engine, a real ML loop wrapped in careless validation, a backend where roughly half the advertised features are scaffolded but not wired, and a frontend whose Analytics, Strategies, Alerts, and Order Book views are non-functional because of contract drift.
+
+The overhaul does three things:
+
+1. **Rebuilds the algorithmic core** into a streaming, O(1)-per-event microstructure engine with full L2 order-book reconstruction, order-flow imbalance (OFI), microprice, adaptive z-score baselines, HMM regime detection, volatility-scaled triple-barrier labelling, embargoed time-series validation, calibrated gradient boosting, a stateful signal engine with hysteresis, a working alert evaluator, and a real event-driven backtester — all fed by a 1 Hz bar stream that is persisted, replayable, and reconstructable.
+2. **Hardens the backend** into a proper Python package with pinned deps, registered middleware, migrations, persistence that actually persists, typed WebSocket contracts with snapshot-on-connect, per-client subscriptions with backpressure, a replay/synthetic data source for offline development, and tests that run.
+3. **Replaces the frontend** with a Next.js (App Router) application: a typed-array Zustand data layer fed by a module-level WebSocket client, TypeScript types generated from the backend's OpenAPI (eliminating contract drift as a bug class), GSAP for all motion, Three.js for the visuals where depth carries information — a **3D order-book liquidity terrain**, GPU **trade-flow particles**, and a **regime-driven shader field** behind the glass — under a dark "Depth" visual identity built from the bid/ask/mid semantics of the order book itself.
+
+Delivery is staged (six stages, each ending in a review stop), backend first.
+
+---
+
+## 1. Current-state findings
+
+Full detail was presented and confirmed in Phase 1. Condensed here so this document stands alone.
+
+### 1.1 Algorithmic core — basic / under-engineered
+
+| Area | Today | Why it's weak |
+|---|---|---|
+| Feature computation | Every feature (VWAP, TWAP, velocity, buy pressure, volatility) is a Python list-comprehension rescan of the 1000-trade deque, 5× per 500 ms tick | O(n) per feature per tick; cost grows with buffer size; recomputes identical windows |
+| Trigger model | Features computed on a wall-clock timer, not on events | Bursty markets are under-sampled; quiet markets are over-sampled |
+| Order book | 10-level snapshots from `@depth10@100ms`; only *total* bid/ask volume is used | No microprice, no depth-weighted imbalance, no OFI, no liquidity-at-N-bps; depth `timestamp` is receipt time not exchange time |
+| Baselines / thresholds | `velocity_baseline = 20` constant; all rule thresholds are absolute bps constants | Meaningless across assets and market eras; rules flicker on/off at the boundary (no hysteresis) |
+| Volatility | `std(returns)` over a 60 s window, not time-scaled | Not comparable across activity levels |
+| Regime | `if volatility > 20 and velocity_ratio > 2: "breakout"` | Hard-coded, not learned |
+| ML labels | Direction of *last-trade* price 10 **ticks** ahead, fixed ±3 bps | Tick horizon drifts with load; last-trade price is bid-ask-bounce noise; fixed bps ignores volatility |
+| ML validation | Random `cross_val_score` on time-series data | Leaks future into past; reported F1 is optimistic |
+| ML training | `run_in_executor(self._train)` with no lock; training buffer in RAM only | Concurrent training races; restart loses every label |
+| Explainability | `shap` not in requirements; `TreeExplainer` built per request | Always `ImportError` → `None` |
+| Backtester | Inserts a row of zeros | Doesn't exist |
+| Alerts | Rules stored, never evaluated; `AlertHistory` never written | Doesn't exist |
+| Persistence | `MarketSnapshot`, `MLModel` tables never written; APScheduler unused | No history to replay, no model lineage |
+| Offline dev | None — live Binance or nothing | Geo-blocked regions (HTTP 451) and tests get no data |
+
+### 1.2 Backend architecture — scaffolded but not wired
+
+- Middleware (`RequestId`, `Timing`, `RateLimit`) defined, never registered.
+- Rule engine lives inside an API router (`api/analytics.py`), causing a circular import worked around with a lazy import.
+- `broadcast_trade` / `broadcast_alert` never called.
+- Flat module layout (`from config import settings`), no `pyproject.toml`, unpinned `>=` deps, no migrations, no lint/type config.
+- `passlib` (unmaintained since 2020; incompatible with bcrypt ≥ 4.1 — the reason a bcrypt hash is hard-coded in `strategies.py`) and `python-jose` (open CVEs 2024-33663/33664).
+- Backend cannot boot from the repo venv (stale Streamlit-era environment; `pydantic_settings`, `sqlalchemy`, `scikit-learn`, etc. missing).
+- `tests/test_features.py` (460 lines) imports from a deleted `src/` tree; `backend/tests/test_api.py` asserts headers that are never set.
+
+### 1.3 Frontend — visually decent, functionally broken
+
+- **Contract drift**: Analytics page expects `trained`/`pending_samples`/`feature_count`, backend sends `model_trained`/`pending_labels`/`feature_names`; SHAP shapes incompatible; regime names disagree; momentum scale off by 100×; backtest POST always 422; alert history expects `rule_name`.
+- **Fabricated data**: `OrderBookChart` generates depth with `Math.random()` while the backend holds real depth.
+- **Dropped messages**: `prediction` WS messages ignored; `trade` messages never sent.
+- **Empty on load**: histories start empty and take minutes to fill after every reload.
+- **Build broken**: `npm run build` fails on unused imports; Vercel deploys by skipping `tsc`.
+- Dead code (`Sidebar`, `ErrorBoundary`), inert settings controls, placeholder On-Chain page.
+- Chart histories rebuilt via array spread every 500 ms.
+- Generic cyan/purple palette with no relationship to what the product does.
+
+---
+
+## 2. Algorithmic & backend overhaul
+
+This is the substance of the upgrade. Each item names what replaces what, and why it is a genuine step up rather than a refactor.
+
+### 2.1 Streaming feature engine — O(1) amortised per event
+
+**Replace** the rescanning `calculate_features()` with `market/features.py`: a `StreamingFeatureEngine` built on **time-windowed ring buffers with running accumulators** (`market/ring.py`).
+
+- `TimeWindowSum`: a deque of `(ts, value)` plus a running sum; `push()` appends and evicts expired head entries; `value()` is O(1). Used for Σpq, Σq (VWAP), Σp, n (TWAP), buy-volume, trade count (velocity). **Float drift is bounded** by Kahan-compensated accumulation plus a full recompute every N evictions (invariant-tested against brute force).
+- `EwmVariance`: Welford/EWMA online variance of log mid-price returns on the **1 Hz bar stream** (§2.9), **time-scaled** to a canonical horizon so volatility is comparable across activity regimes; an event-time EWMA supplements it for intra-second reactivity.
+- Features are updated **on trade / book events**, not on a timer. A separate 4 Hz coalescing broadcaster reads the latest state. Compute is decoupled from transport (cadence tiers in §2.12).
+- z-scores are emitted only after a warm-up minimum (else `null`), so the UI can show "calibrating" instead of garbage.
+- All windows are configurable per symbol; the engine is instantiated **per symbol** (ships with `BTCUSDT` default plus an `ETHUSDT`/`SOLUSDT` allowlist).
+
+*Why next-level:* moves from O(n·k) per tick to O(1) amortised per event; sub-millisecond feature latency; correct time-scaling; event-driven semantics.
+
+### 2.2 Full L2 order-book reconstruction
+
+**Replace** 10-level snapshots with `market/book.py`: a `LocalOrderBook` maintained from Binance's **diff-depth stream** (`<symbol>@depth@100ms`) synchronised against a REST snapshot (`/api/v3/depth?limit=1000`) using the documented `lastUpdateId / U / u` sequencing (`U ≤ lastUpdateId+1 ≤ u` for the first event, `U == prev_u + 1` thereafter), with automatic resync on gap.
+
+- Storage: two `SortedDict`s (`sortedcontainers`) price → qty; top-N extraction is O(N).
+- Derived per update: best bid/ask, mid, spread, **microprice** `(P_bid·Q_ask + P_ask·Q_bid)/(Q_bid+Q_ask)`, **depth-weighted imbalance** with exponential decay by distance from mid, **liquidity within N bps** (5/10/25), **book slope** (linear fit of cumulative depth vs. distance), and **OFI — order-flow imbalance** (Cont, Kukanov & Stoikov 2014) accumulated from best-level changes per event and summed per bar.
+- Exchange event time (`E`) used for timestamps.
+- **Endpoint fallbacks:** REST and WS hosts are a configurable ordered list (`api.binance.com` / `stream.binance.com`, then Binance's documented market-data-only hosts `data-api.binance.vision` / `data-stream.binance.vision`). HTTP 451 on either REST or WS triggers the next host, then the replay/synthetic source (§2.10).
+
+*Why next-level:* microprice and OFI are the two most cited short-horizon predictive signals in the microstructure literature; the current system has neither. The full book also powers the 3D liquidity terrain — the frontend's signature visual — from real data.
+
+### 2.3 Adaptive baselines and z-scores
+
+**Replace** constants with `market/baseline.py`: every raw feature carries an **EWMA mean + EWMA std** (two half-lives: fast ≈ 1 min, slow ≈ 15 min). The engine emits `*_z` fields (`spread_z`, `velocity_z`, `vol_z`, `ofi_z`, `imbalance_z`).
+
+Signals and rules operate on z-scores ("spread 2.5σ above its 15-min mean"), not absolute bps. `velocity_baseline` becomes the slow EWMA rather than the number 20.
+
+### 2.4 Regime detection — learned, not hard-coded
+
+**Replace** the threshold `if/elif` with `market/regime.py`: a **Gaussian HMM** (`hmmlearn`, 4 states) fitted on 1-second bars of `[log_return, |log_return|, spread_z, ofi_z]` over the trailing ~30 minutes, refit every 5 minutes in an executor. States are labelled by sorting on learned emission variance: `quiet` → `trending` (split by mean return sign) → `volatile` → `breakout`. The current state is decoded by forward filtering on the latest window, with a **minimum dwell time** to prevent flicker. The threshold rules remain as a **fallback** until ≥ N bars exist.
+
+Regime is broadcast as its own WS message and feeds the ML features, the signal engine, the alert evaluator, and — on the frontend — the camera and shader field.
+
+### 2.5 ML pipeline v2
+
+**Replace** `ml_engine.py` with `ml/` (feature pipeline, labels, training, registry, explain, drift, engine). ML operates on the **1 Hz bar stream**, not on raw events.
+
+| Concern | Today | Plan |
+|---|---|---|
+| Target price | last trade | **mid-price** (removes bid-ask bounce) |
+| Horizon | 10 ticks | **time-based**, H seconds (default 5 s) |
+| Labels | fixed ±3 bps | **Triple-barrier** (López de Prado): upper/lower barriers at ±k·σ_t (volatility-scaled), vertical barrier at H; label = first barrier touched (3 classes: up / down / timeout) |
+| Features | 26 (price/spread/velocity/vol stats) | 26 + microprice deviation, OFI (multi-window), depth-weighted imbalance, liquidity@N bps, book slope, regime one-hot, z-scores |
+| Model | RF + GB, 40/60 vote; StandardScaler | **`HistGradientBoostingClassifier`** (`class_weight="balanced"`, early stopping) wrapped in **`CalibratedClassifierCV`** (isotonic ≥ 1 000 samples, sigmoid below) so "confidence" is a calibrated probability; `LogisticRegression` pipeline baseline reported alongside. No scaler needed for HGB |
+| Validation | random K-fold | **`TimeSeriesSplit(gap = H bars)`** — the gap is the embargo that purges label overlap; report OOS accuracy, log-loss, **Brier score**, per-fold — honestly |
+| Importance | impurity-based | **Permutation importance** on OOS folds + cached SHAP `TreeExplainer` built once at train time |
+| Training | unguarded executor; RAM buffer | `threading.Lock(blocking=False)`; train into a fresh `ModelBundle`; **atomic swap**; never block the event loop. **Training set is derived from `market_snapshots`** (features + future mid in the same table), so it is **reconstructed on startup** — a restart no longer resets the model to zero |
+| Registry | none | `ml_models` rows written with version, metrics JSON, feature list, path; last N artefacts retained on disk |
+| Predictions | not stored | **`predictions` table**: every 1 Hz prediction with probabilities and horizon; resolved against realised mid after H s. Feeds the drift monitor and `ml_signal` backtests |
+| Drift | none | `ml/drift.py`: rolling OOS hit-rate & Brier vs. training-time values; **edge-decay alarm** when it drops below threshold → surfaced in UI and as an alert |
+| Cold start | silent | explicit `warming_up` state with `samples_collected / samples_required` in every prediction payload |
+
+*Honesty clause:* short-horizon crypto direction is close to unpredictable. The goal is a **calibrated** model with honest walk-forward metrics and a visible drift monitor — not inflated accuracy. The UI will show Brier/log-loss and "edge vs. baseline", not a single accuracy number.
+
+### 2.6 Signal engine (replaces the rule engine)
+
+**Move** the 10 rules out of `api/analytics.py` into `signals/` and **replace** stateless lambdas with declarative, stateful `SignalRule` objects:
+
+```python
+SignalRule(
+    id="spread_wide", priority="HIGH",
+    enter=Cond("spread_z", ">", 2.0), exit=Cond("spread_z", "<", 1.0),   # hysteresis
+    min_duration_s=2, cooldown_s=30,
+    message="Spread {spread_bps:.1f} bps ({spread_z:+.1f}σ) — liquidity thinning",
+    action="Prefer limit orders", impact="…",
+)
+```
+
+Rules are Pydantic models (JSON-serialisable, later user-editable), evaluated on every feature update, emitting `activated` / `deactivated` transitions rather than a full list every tick. The last 200 transitions are kept in memory and exposed via REST so the feed is populated on reload. Ships with the existing 10 rules re-expressed on z-scores plus OFI/microprice/regime rules.
+
+**One condition evaluator** (`core/conditions.py`) is shared by signals, alerts, and backtest strategies, and validates field names against the **feature catalog** (§2.11).
+
+### 2.7 Alert evaluator — actually wired
+
+**New** `alerts/evaluator.py`: on each **bar close** (1 Hz — bounds DB writes), evaluate enabled `AlertRule` rows (cached in memory, invalidated by the CRUD router), honour `cooldown_seconds`, write `AlertHistory`, broadcast `alert` over WS (never dropped), and dispatch to Discord webhook (`alerts/notify.py`) when configured. Alerts can target raw features, z-scores, regime, or model probability.
+
+### 2.8 Backtester — real, event-driven
+
+**Replace** the stub with `backtest/`:
+
+- **Data**: replays `market_snapshots` (1 Hz bars). If history < N minutes, falls back to the **synthetic generator** (§2.10), clearly labelled as such in the result.
+- **Strategy spec** (declarative JSON on the `Strategy.config` column):
+  ```json
+  { "side": "both", "size_pct": 10,
+    "entry": { "all": [ {"f":"ofi_z","op":">","v":1.5}, {"f":"regime","op":"in","v":["trending"]} ] },
+    "exit":  { "any": [ {"f":"ofi_z","op":"<","v":0}, {"f":"bars_held","op":">=","v":30} ] },
+    "stop_loss_bps": 20, "take_profit_bps": 40 }
+  ```
+  plus an `ml_signal` strategy type that trades on stored `predictions`.
+- **Engine**: bar-by-bar; fills at next bar's mid ± slippage bps; commission bps; position/PnL accounting; produces **equity curve, drawdown series, trade list, Sharpe & Sortino (computed on 1-minute-resampled equity, annualised), max DD, profit factor, win rate, exposure**. Persisted to `backtest_results` (`equity_curve_json`, `trades_json`).
+- Runs in an executor; long runs report progress over WS.
+
+### 2.9 Bars, persistence, scheduling, migrations
+
+- **`market/bars.py`** — a 1 Hz bar builder per symbol: OHLC of mid, last trade, volume, buy volume, trade count, OFI sum, spread/microprice/imbalance at close, all z-scores, regime. Bars are the shared substrate for volatility, HMM, ML features and labels, alerts, snapshot persistence, replay, and backtesting.
+- `MarketSnapshot` = one row per bar, written via a batched writer (flush every 5 s). Retention prune (default 7 days; ~600 k rows/symbol in SQLite is fine). SQLite runs in **WAL mode** with `synchronous=NORMAL`.
+- Background tasks (plain asyncio — no APScheduler): snapshot flush, prediction resolution, retrain check, HMM refit, retention prune, model-registry GC.
+- **Alembic** migrations; SQLite stays the default (Postgres is a `DATABASE_URL` change).
+
+### 2.10 Data sources — live, replay, synthetic
+
+`DATA_SOURCE = live | replay | synthetic` (per symbol):
+
+- **live** — Binance with host fallbacks (§2.2).
+- **replay** — `market/replay.py` streams a recorded NDJSON file of raw trade + diff-depth events at real or accelerated speed through the *same* pipeline. `scripts/record_stream.py` records live streams; a short recorded fixture ships in `tests/fixtures/` for tests and for a guaranteed-working local demo.
+- **synthetic** — `market/synthetic.py`: GBM mid-price with Hawkes-style trade clustering, a spread/queue model that emits plausible diff-depth events. Used when live is blocked (451) and no recording exists, and to pre-warm ML in demos. Every payload carries `source` so the UI badges it.
+
+*Why this matters:* the platform must run, demo, and test deterministically anywhere — including geo-blocked regions and CI.
+
+### 2.11 Transport & API contracts
+
+- **Typed WS messages** in `schemas/ws.py` (discriminated union on `type`); exposed via a documented `GET /api/v1/ws/schema` so they appear in OpenAPI → the frontend generates TS types from one source.
+- Message types: `hello` (server capabilities, symbols, source), **`snapshot`** (on connect/subscribe: last 600 bars + current book + regime + signals + prediction — **no more empty charts on reload**), `features` (4 Hz, coalesced), `book` (5 Hz top-50 + OFI/microprice, **subscribers only**), `trades` (batched 10 Hz), `bar` (1 Hz), `prediction` (1 Hz), `regime` (on change), `signals` (transitions), `alert` (on fire), `backtest_progress`. Client → server: `{ "op": "subscribe", "channels": [...], "symbol": "..." }`.
+- **Per-client queues** with a drop-oldest policy for `features`/`book` (latest wins) and never-drop for `alert`/`snapshot`; `orjson` serialisation.
+- **Feature catalog** — `market/catalog.py` `FEATURE_REGISTRY` (name → unit, description, kind, allowed ops) exposed at `GET /api/v1/market/feature-catalog`; used by API validation, the alert form, and the strategy builder.
+- Middleware registered; rate limit exempts `/ws`. Structured logging (`core/logging.py`).
+- REST additions: `/market/book`, `/market/bars?from&to`, `/market/feature-catalog`, `/analytics/regime`, `/analytics/model-registry`, `/analytics/drift`, `/analytics/signals/history`, `/system/metrics` (event rates, queue depths, latencies — shown in Settings); backtest request schema fixed.
+- `scripts/export_openapi.py` writes `openapi.json` without a running server; the generated `schema.d.ts` is **committed** so Vercel builds without the backend.
+
+### 2.12 Cadence tiers (compute budget)
+
+| Tier | Runs | Work |
+|---|---|---|
+| per event (100s/s in bursts) | on each trade / depth diff | O(1) feature updates, book apply, OFI accumulation |
+| 4–5 Hz | coalescing broadcaster | `features`, `book`, batched `trades` |
+| 1 Hz | bar close | bar build, z-scores, ML feature vector + predict, regime decode, signal & alert evaluation, snapshot enqueue, prediction resolution |
+| 5 min | scheduled | HMM refit (executor) |
+| N samples / T min | scheduled | model retrain (executor, locked, atomic swap) |
+| daily | scheduled | retention prune, registry GC |
+
+### 2.13 Backend hygiene & security
+
+- Restructure into a package `backend/algoviz/…` (`uvicorn algoviz.main:app`); Python ≥ 3.11.
+- `pyproject.toml` (pinned deps, `ruff`, `mypy`, `pytest` config) + exported `requirements.txt` for Render.
+- **`passlib` → `bcrypt`** directly; **`python-jose` → `PyJWT`**. `SECRET_KEY` validator **fails fast** if the dev default is used with `ENVIRONMENT=production`. Timezone-aware datetimes throughout (`datetime.utcnow()` is deprecated).
+- Fresh venv; Streamlit-era packages gone; `websockets` unpinned to current. No `uvloop` dependency (Windows dev).
+- Multi-stage Dockerfile; no `--reload` in the production CMD. Memory budget ≤ 400 MB RSS (Render free tier); SHAP explainer cached once, explanations computed on request.
+- No Redis: single-process pub/sub is sufficient; the hub is an interface so Redis can be added if horizontally scaled.
+- Version bumps to **3.0.0**.
+- Tests: ring-buffer/feature property tests, book-sync tests (replayed diff sequences incl. gap → resync), triple-barrier vs. brute force, `TimeSeriesSplit(gap)` leakage test (shuffled labels → chance level), backtester accounting, signal hysteresis, alert cooldown, replay determinism, API contract tests. Orphaned `tests/test_features.py` deleted after its intent is ported.
+
+---
+
+## 3. Frontend architecture
+
+### 3.1 Stack
+
+| Layer | Choice | Reason |
+|---|---|---|
+| Framework | **Next.js** (latest stable, 16.x — verified at scaffold), App Router, React 19, TypeScript strict | Mandated; file routing, `error.tsx`/`loading.tsx`, metadata, Vercel-native; `output: 'standalone'` for Docker |
+| 3D | **Three.js** via `@react-three/fiber` v9 + `@react-three/drei` + `@react-three/postprocessing`, custom GLSL | Declarative scene graph inside React, with raw shader access where it matters |
+| Motion | **GSAP 3.13+** (fully free incl. all plugins since the Webflow acquisition) + `@gsap/react` (`useGSAP`), ScrollTrigger, Flip, SplitText | Mandated; timelines, counters, camera tweens, layout transitions. Framer Motion removed |
+| Styling | **Tailwind CSS 4** — CSS-first (`@import "tailwindcss"` + `@theme` tokens in `globals.css`, `@tailwindcss/postcss`; no `tailwind.config.ts`) + a small `glass.css` component layer | Token discipline without inline styles; glass effects need real CSS |
+| State | **Zustand 5** with `useShallow` + `persist` (settings); histories in **typed-array ring buffers** with a `head` counter for React subscribers | O(1) append, zero-allocation, GPU-uploadable; the counter is what notifies 2D charts |
+| Server state | **TanStack Query 5** | CRUD pages |
+| API client | **`openapi-typescript`** (types) + **`openapi-fetch`** (typed client) from the committed `openapi.json` | Kills contract drift; `npm run types` is a build step; no axios |
+| 2D charts | **lightweight-charts 5** (price/VWAP/microprice), custom Canvas for strips | Keep what works; GSAP handles transitions |
+| Fonts | Geist Sans / Geist Mono via `next/font` | Self-hosted, no Google Fonts import |
+| Perf tier | `detect-gpu` → `low / mid / high` (overridable in Settings) | Terrain resolution and particle cap scale with the GPU |
+| Icons | lucide-react | Keep |
+| Tests | Vitest + Testing Library; Playwright E2E | Build must pass `tsc` + lint + tests |
+
+### 3.2 Data layer
+
+- `lib/ws/client.ts`: **module-level** WebSocket client (outside React) — reconnect with jittered backoff, heartbeat, subscription management, `snapshot` hydration on connect, symbol switching (rings reset), message dispatch to the store. React only subscribes. A global **connection banner** shows reconnect countdown and the data `source` (live / replay / synthetic).
+- `lib/store/`: Zustand slices — `market` (latest features, z-scores), `book` (top-50 bids/asks as `Float32Array`s + a `Float32Array` depth-history ring for the terrain), `trades` (ring), `history` (price/vwap/microprice/spread/vol/ofi rings, `Float64Array` × 600, hydrated from `snapshot`), `intel` (prediction, regime, signals, drift, warm-up), `ui`.
+- **Display interpolation**: data arrives at 1–5 Hz; displayed numerics tween between samples with GSAP (`gsap.quickTo`) so the UI feels continuous at 60 fps without React re-renders per frame. Three.js reads store rings directly in `useFrame`.
+
+### 3.3 Visual identity — "Depth"
+
+The product is about **liquidity and order flow**. The identity is built from the order book's own semantics, not from a generic palette.
+
+| Token | Value | Meaning |
+|---|---|---|
+| `--bg-abyss` | `#05070c` | The floor. Depth is literal depth |
+| `--bg-deep` | `#0a0f1a` | Panel base |
+| `--bid` | `#19d3c5` (teal) | Liquidity below — support. Keeps the green-side convention traders expect while being distinctive |
+| `--ask` | `#ff4d6d` (coral) | Pressure above — resistance. Red-side convention preserved |
+| `--mid` | `#ffd166` (gold) | Microprice/mid — the thin line where they meet |
+| `--regime-quiet / -trending / -volatile / -breakout` | `#3b6cff` / bid-or-ask tint / `#ffb020` / `#b06cff` | Drives the shader field and accent glows |
+| `--glass-*` | blur 16 px, saturate 140 %, border `rgba(255,255,255,.06)`, top-edge highlight, 2 % noise | Glass tiers 1–3 |
+| Type | Geist Sans (UI), Geist Mono (numerics, `tabular-nums`) | |
+
+Teal/coral was chosen over pure green/red deliberately: the pair stays distinguishable under deuteranopia and protanopia while preserving the trader's convention.
+
+**Motion language:** everything moves at the speed of the market. Pulse periods, particle emission, shader turbulence, and glow intensity are functions of `velocity_z`, `vol_z`, and regime — the same idea the old MarketPulse gestured at, applied system-wide.
+
+### 3.4 Glassmorphism & interaction system
+
+- `components/glass/`: `GlassPanel` (tiers), `GlassButton`, `GlassTab`, `GlassInput`, `GlassRow`, `GlassBadge`. Each has a **hover contract**: lift (`-2px`), border brightens, semantic glow (`box-shadow` in the panel's accent), and a **cursor-tracking radial highlight** (`--mx/--my` set on `pointermove`, one listener at the root). Focus-visible rings for keyboard.
+- Every interactive element (nav, cards, rows, chips, chart legends, gauge segments, 3D terrain hover) has a hover state. No exceptions.
+- `prefers-reduced-motion`: particles/turbulence off, tweens → instant, data unchanged.
+
+### 3.5 Three.js / WebGL — only where depth carries information
+
+1. **Order Book Liquidity Terrain** (dashboard hero, `/book` full-screen)
+   A surface with X = price bins **relative to mid** (±N bps, 128 bins at high tier / 64 low), Z = time (64 slices scrolling), Y = cumulative depth. Implemented as a `PlaneGeometry` displaced in a **vertex shader** from an `R32F DataTexture` holding the depth ring; time scrolling is a `uHead` uniform (no CPU memmove). Bid side teal, ask side coral, mid line gold; fragment shader shades by depth and adds a fresnel rim. Camera: gentle orbit, GSAP-tweened to a preset per regime; hover raycasts to a price/qty tooltip. The render loop **pauses on `visibilitychange` and when the canvas is off-screen**; DPR clamped `[1, 1.5]`.
+2. **Trade-Flow Particles**
+   `Points` with a custom shader; each trade spawns a particle whose trajectory is a deterministic function of its spawn params (`birth`, `side`, `size`, `x`), so the CPU writes **only on spawn** and the GPU evaluates `position(t)`. Buys rise from the bid slope, sells fall from the ask slope; size ∝ quantity; density = velocity made visible. Cap 4 096 (high) / 1 024 (low).
+3. **Regime Field** (page background, behind the glass)
+   Fullscreen quad, simplex-noise flow field; uniforms `uTurbulence` (vol_z), `uHue` (regime), `uFlow` (OFI sign → drift direction). Sub-1 ms; the glass panels literally look into the market's state.
+4. Everything else — gauges, SHAP bars, strips, tables — stays **2D** (SVG/Canvas + GSAP). 3D for decoration is explicitly avoided.
+
+Each 3D view has a 2D/textual equivalent (depth curve, tape) for accessibility and for WebGL-less fallback.
+
+### 3.6 Routes
+
+| Route | Content |
+|---|---|
+| `/` | Bento dashboard: Terrain hero, KPI strip (price, spread, microprice Δ, OFI, velocity, vol — all z-annotated), price/VWAP/microprice chart, regime + prediction panel (with warm-up progress), signals feed, trade tape, spread/vol strips, data-source badge |
+| `/book` | Full-screen Terrain, cumulative depth curve, OFI timeline, liquidity@N bps |
+| `/intelligence` | Calibrated prediction + probabilities, SHAP (cached), permutation importance, walk-forward metrics per fold (Brier/log-loss), model registry timeline, **drift monitor** |
+| `/strategies` | Declarative strategy builder (condition editor populated from the feature catalog), backtest runner with equity/drawdown curves, trade list, metrics, synthetic-data badge; Flip transitions on expand |
+| `/alerts` | Rule CRUD (typed form from the feature catalog), live history feed (WS), acknowledge |
+| `/settings` | Symbol, data source, perf tier (auto/override), motion, connection + `/system/metrics`, accent intensity (dark-only theme) |
+| ⌘K palette, toasts, connection banner, `error.tsx`, `loading.tsx` | App-wide |
+
+**Removed:** `/onchain` (placeholder with no backend; out of scope — §6 decision 1).
+
+### 3.7 Performance & quality gates
+
+- 60 fps on an integrated GPU at 1080p with Terrain 128×64 + 4k particles at high tier; WS → paint < 100 ms.
+- `three` and R3F loaded only on routes that use them (`dynamic(..., { ssr: false })`).
+- `next build` must pass `tsc`, ESLint, Vitest; Playwright smoke on the main routes.
+- Lighthouse Performance ≥ 90 on non-3D routes, Accessibility ≥ 95.
+
+---
+
+## 4. Keep / modify / replace
+
+### 4.1 Backend (`AlgoViz-Professional/backend/`)
+
+| File | Decision | Notes |
+|---|---|---|
+| `main.py` | **Modify** | Move to `algoviz/main.py`; register middleware; wire new services; WS subscribe protocol |
+| `config.py` | **Modify** | Per-symbol settings; data source; host fallbacks; z-score/HMM/label params; `SECRET_KEY` validator; remove absolute-bps rule thresholds |
+| `database.py` | **Keep** (relocate) | WAL mode; Alembic |
+| `models/models.py` | **Modify** | `MarketSnapshot` → bar row (+microprice/ofi/imbalance_w/regime/z-scores); `MLModel` +metrics JSON, feature list; **new `Prediction`**; `BacktestResult` already fits |
+| `schemas/schemas.py` | **Replace** | Split into `schemas/{rest,ws}.py`; single source of truth for generated TS |
+| `services/market_data.py` | **Replace** | → `market/{ingest,book,bars,ring,features,baseline,regime,catalog,replay,synthetic,service}.py`. The Binance connection loop and 451 handling are carried over into `ingest.py` |
+| `services/ml_engine.py` | **Replace** | → `ml/{features,labels,train,registry,explain,drift,engine}.py`. The 26 feature ideas are carried over and extended |
+| `api/analytics.py` | **Modify** | Rule engine extracted to `signals/`; new endpoints; new contracts |
+| `api/market.py` | **Modify** | +`/book`, `/bars`, `/feature-catalog` |
+| `api/strategies.py` | **Modify** | Real backtest; request schema fixed; default-user hack replaced |
+| `api/alerts.py` | **Modify** | Pydantic bodies instead of `dict`; cache invalidation hook |
+| `api/auth.py`, `core/auth.py` | **Modify** | `bcrypt` + `PyJWT`; relocate |
+| `core/middleware.py` | **Keep** | Finally registered |
+| `ws/hub.py` | **Modify** | Typed messages, per-client queues + drop policy, subscriptions, snapshot-on-connect, `orjson` |
+| `tests/test_api.py` | **Modify** | Fix assertions; extend |
+| `requirements.txt`, `runtime.txt` | **Replace** | `pyproject.toml` + exported pins |
+| `Dockerfile` | **Modify** | Multi-stage; prod CMD |
+
+### 4.2 Frontend (`AlgoViz-Professional/frontend/`) — **replaced entirely**
+
+**Justification:** Next.js is mandated and is a different build/runtime model from Vite (App Router, RSC boundaries, file routing) — there is no meaningful in-place migration. Framer Motion → GSAP is a full animation-layer swap. Most page data-binding code is wrong today (contract drift) and would be rewritten against generated types regardless. Rebuilding is cheaper and safer than patching.
+
+What carries over as **design intent**, re-implemented: MarketPulse (→ system-wide motion language), VelocityGauge, SpreadHeatmap and VolatilityChart (→ 2D strips), PriceChart (lightweight-charts wrapper, kept), CommandPalette, ToastProvider, TickerTape, the glass token ideas from `index.css`.
+Dropped: `Sidebar.tsx`, `ErrorBoundary.tsx` (dead), `OnChain.tsx` (placeholder), `store.ts` hand-written types (generated instead), Framer Motion, axios.
+
+### 4.3 Repo / infra
+
+| File | Decision |
+|---|---|
+| `docker-compose.yml` | **Modify** (new start command, Next.js standalone service) |
+| `render.yaml` | **Modify** (`uvicorn algoviz.main:app`) |
+| `frontend/vercel.json`, `_redirects` | **Replace** / **Delete** (Next.js preset) |
+| `README.md` | **Replace** |
+| `.env.example` | **Modify** (+ `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL`, `DATA_SOURCE`) |
+| `tests/test_features.py` (root) | **Delete** after porting intent |
+| `implementation_plan.md.resolved` (root) | **Delete** (stale; superseded by this file) |
+| root `.venv` | **Recreate** |
+| CI | **New** `.github/workflows/ci.yml` — ruff/mypy/pytest + `pip-audit`; tsc/eslint/vitest/`next build` + `npm audit` |
+
+---
+
+## 5. Project structure going forward
+
+```
+AlgoViz-Professional/
+├── backend/
+│   ├── algoviz/
+│   │   ├── main.py                 # app factory, lifespan, middleware, WS endpoint
+│   │   ├── config.py               # Settings (per-symbol, data source, hosts, z-score/HMM/label params)
+│   │   ├── db/                     # engine (WAL), session, Base
+│   │   ├── core/                   # middleware, auth (bcrypt+PyJWT), logging, conditions (shared evaluator)
+│   │   ├── market/
+│   │   │   ├── ingest.py           # Binance trade + diff-depth streams, host fallbacks, resync, 451 handling
+│   │   │   ├── book.py             # LocalOrderBook (L2), microprice, OFI, liquidity@bps, slope
+│   │   │   ├── ring.py             # TimeWindowSum (Kahan), EwmVariance, ring buffers
+│   │   │   ├── features.py         # StreamingFeatureEngine (event-driven, O(1))
+│   │   │   ├── baseline.py         # EWMA mean/std → z-scores (with warm-up)
+│   │   │   ├── bars.py             # 1 Hz bar builder — the shared substrate
+│   │   │   ├── regime.py           # GaussianHMM regime detector + fallback + min-dwell
+│   │   │   ├── catalog.py          # FEATURE_REGISTRY (single source of truth for field names)
+│   │   │   ├── replay.py           # NDJSON recording playback
+│   │   │   ├── synthetic.py        # GBM + Hawkes + spread/queue simulator
+│   │   │   └── service.py          # per-symbol orchestration, cadence tiers, coalescing broadcaster, snapshot writer
+│   │   ├── ml/
+│   │   │   ├── features.py         # ML feature vector (extended)
+│   │   │   ├── labels.py           # triple-barrier, time-based
+│   │   │   ├── train.py            # TimeSeriesSplit(gap), calibrated HGB, permutation importance
+│   │   │   ├── registry.py         # ml_models rows + artefact retention
+│   │   │   ├── explain.py          # cached SHAP explainer
+│   │   │   ├── drift.py            # prediction resolution, rolling OOS metrics, edge-decay alarm
+│   │   │   └── engine.py           # ingest/predict/guarded-train/atomic-swap; rebuild from snapshots on startup
+│   │   ├── signals/                # SignalRule (hysteresis, cooldown), engine, default rules, transition history
+│   │   ├── alerts/                 # evaluator (1 Hz), notify (Discord)
+│   │   ├── backtest/               # engine, strategy spec, metrics
+│   │   ├── api/                    # market, analytics, strategies, alerts, auth, system routers
+│   │   ├── ws/                     # hub (queues, subscriptions, snapshot-on-connect), messages
+│   │   ├── schemas/                # rest.py, ws.py (OpenAPI source of truth)
+│   │   └── models/                 # ORM (+ Prediction)
+│   ├── alembic/
+│   ├── scripts/                    # record_stream.py, export_openapi.py
+│   ├── tests/  (+ fixtures/ recorded stream)
+│   ├── pyproject.toml
+│   ├── requirements.txt            # exported pins (Render)
+│   └── Dockerfile
+├── frontend/
+│   ├── app/
+│   │   ├── layout.tsx              # shell, fonts, RegimeField, nav, palette, toasts, connection banner
+│   │   ├── page.tsx                # dashboard
+│   │   ├── book/  intelligence/  strategies/  alerts/  settings/
+│   │   ├── error.tsx  loading.tsx
+│   ├── components/
+│   │   ├── glass/                  # GlassPanel, GlassButton, …
+│   │   ├── three/                  # Terrain, TradeParticles, RegimeField, shaders/
+│   │   ├── charts/                 # PriceChart, DepthCurve, OfiTimeline, strips
+│   │   ├── panels/                 # KpiStrip, PredictionPanel, SignalsFeed, TradeTape, DriftMonitor, …
+│   │   └── ui/                     # CommandPalette, Toasts, Nav, ConnectionBanner
+│   ├── lib/
+│   │   ├── ws/client.ts            # module-level WS client (+ snapshot hydration, symbol switch)
+│   │   ├── store/                  # Zustand slices, typed-array rings (+ head counters)
+│   │   ├── api/                    # committed openapi.json → schema.d.ts, openapi-fetch client
+│   │   ├── gsap/                   # registered plugins, shared eases, useCounter
+│   │   ├── perf/                   # detect-gpu tiering
+│   │   └── theme/                  # tokens, regime → colour maps
+│   ├── styles/                     # globals.css (@import tailwindcss + @theme tokens), glass.css
+│   ├── tests/  e2e/
+│   ├── next.config.ts  postcss.config.mjs  package.json
+├── .github/workflows/ci.yml
+├── docker-compose.yml  render.yaml  .env.example  README.md
+```
+
+---
+
+## 6. Decisions (confirmed)
+
+1. **Drop `/onchain`** — placeholder with no backend; tracked as a future phase. ✅
+2. **Multi-symbol** — engine per-symbol; `BTCUSDT` default + `ETHUSDT`/`SOLUSDT` allowlist. ✅
+3. **Tailwind CSS 4** (CSS-first) + glass layer. ✅
+4. **Backend package restructure** to `backend/algoviz/`. ✅
+5. **SQLite stays** (WAL); Alembic makes Postgres a config change. ✅
+6. **`hmmlearn`** for regime detection with threshold fallback. ✅
+7. **`frontend/` directory name** unchanged. ✅
+8. *(added in audit)* **`bcrypt` + `PyJWT`** replace `passlib` + `python-jose`. ✅
+9. *(added in audit)* **`DATA_SOURCE` live/replay/synthetic** is in scope. ✅
+
+---
+
+## 7. Delivery stages (Phase 3 onward)
+
+Each stage ends with a review stop; nothing proceeds without sign-off.
+
+| Stage | Scope | Reviewable outcome |
+|---|---|---|
+| **A — Backend foundation** | Package restructure, `pyproject`, pinned deps, fresh venv, `bcrypt`/`PyJWT`, `SECRET_KEY` validator, tz-aware datetimes, middleware registered, WAL + Alembic, fixed tests, structured logging, CI skeleton. Existing engine kept running in the new layout | `pytest` green; `/health` and `/docs` up; `ruff`/`mypy` clean |
+| **B — Market engine** | Ring buffers, O(1) features, L2 book + resync + host fallbacks, microprice/OFI/liquidity/slope, EWMA baselines & z-scores (warm-up), **bars**, HMM regime, **feature catalog**, **replay + synthetic sources + recorder**, snapshot persistence, coalescing broadcaster, typed WS messages + subscriptions + **snapshot-on-connect** | Live or replayed features/book/regime streaming; property + replay tests green; latency numbers in the PR |
+| **C — Intelligence** | ML v2 (triple-barrier, `TimeSeriesSplit(gap)`, calibrated HGB, registry, guarded training, rebuild-from-snapshots, **predictions table**, cached SHAP, **drift**), signal engine + shared condition evaluator, alert evaluator + Discord, backtester, final REST/WS contracts, OpenAPI export script | Honest walk-forward metrics; model survives restart; alerts fire; backtests produce equity curves; contract tests green |
+| **D — Frontend foundation** | Next.js scaffold, Tailwind tokens, glass system, GSAP setup, WS client + typed-array store + snapshot hydration, generated types (committed), perf tiering, layout/nav/palette/toasts/connection banner, dashboard 2D panels | `next build` passes all gates; live dashboard with 2D panels populated on first paint |
+| **E — Frontend visuals & pages** | Terrain, particles, regime field, `/book`, `/intelligence`, `/strategies`, `/alerts`, `/settings` | Every route functional against live/replay backend; 60 fps check; reduced-motion verified |
+| **F — Integration & hardening** | Playwright E2E, perf pass, Docker/Render/Vercel configs, README, CI complete (+ `pip-audit`/`npm audit`), stale files removed | One-command local run (replay mode works with no internet); deploy configs verified; final review |
+
+---
+
+## 8. Verification
+
+- **Unit / property:** ring-buffer invariants (window sums equal brute force after 10⁶ pushes), book sync against recorded diff sequences (incl. gap → resync), triple-barrier vs. brute force, `TimeSeriesSplit(gap)` leakage test (shuffled labels → chance level), backtester accounting (PnL = Σ trades − costs), hysteresis & cooldown behaviour, replay determinism (same fixture → identical bars).
+- **Integration:** API contract tests against generated schema; WS subscribe/drop-policy/snapshot tests; alert fires end-to-end; model rebuilds from snapshots after restart.
+- **Frontend:** Vitest for store rings and WS dispatch; Playwright smoke for all routes; `tsc`/ESLint gates.
+- **Manual:** live dashboard on a real Binance feed; Terrain reflects book changes within 100 ms; regime transitions recolour the field; drift monitor updates after training; a strategy backtest produces a plausible equity curve; Discord webhook receives an alert; replay mode runs the full UI offline.
+
+---
+
+## 9. Revision log
+
+**Rev 2 (audit):** fixed Tailwind 4 config model, R3F frameloop wording, `TimeSeriesSplit(gap)` precision, Next.js version; added §2.9 bars, §2.10 data sources (live/replay/synthetic + recorder), §2.12 cadence tiers, feature catalog, shared condition evaluator, `predictions` table + drift resolution, training-set reconstruction from snapshots, snapshot-on-connect WS message, host fallbacks for 451, Kahan/recompute for running sums, z-score warm-up, HMM min-dwell, `bcrypt`/`PyJWT` swap, `SECRET_KEY` fail-fast, tz-aware datetimes, WAL mode, `openapi-fetch`, `detect-gpu` tiering, `next/font`, committed generated types, connection banner, symbol switching, colour-vision rationale, memory budget, no-Redis rationale, security audits in CI.
+
+**Rev 3 (delivery, 2026-09-19):** Stages A–F delivered. Deviations from the plan, all deliberate:
+- 3D stack is `three` + `@react-three/fiber` only — no `@react-three/drei` or `@react-three/postprocessing` (OrbitControls is imported from `three/examples`; bloom was not needed once the shader had its own rim/contour lighting). Kept the dependency surface and the 230 KB gz chunk from growing, and the chunk is fetched only after the page settles and never on the low tier.
+- GSAP: core + `@gsap/react` are used (entrance, counters, camera rigs, palette/toasts); ScrollTrigger/Flip/SplitText were not needed by the final layouts.
+- Added to the backend beyond the plan: a binned cumulative **depth profile** on the book payload (the terrain needs the whole band, not the top-N levels) and a far-liquidity layer with random walls in the synthetic exchange so offline runs have book structure.
+- Preferences persistence writes only on change and rehydrates on the `storage` event (two tabs used to clobber each other).
+- Docker images were verified by the CI `images` job rather than locally (no daemon on the dev machine); Lighthouse was not run — bundle budgets were checked from `next build` output instead (main ≈ 70 KB gz, charts ≈ 51 KB gz, three ≈ 234 KB gz lazy).
+
+- **Rev 3.1 (final review, 2026-09-19):** the live feed was exercised end to end against the finished frontend. Findings fixed: synthetic bars and synthetic-trained models had been feeding the live model (persisted bars are now loaded per data source, and synthetic/replay runs get their own database and model store by default); the ambient background was invisible because `<body>`'s own background painted over the fixed layers; the depth-profile band is now adaptive per instrument (BTC's book saturates within a few bps, an altcoin's needs the full 25). Visual pass: CSS aurora + dot grid on every tier, WebGL flow field + drifting motes on mid/high, regime-coloured glow and light pool on the terrain, tick flashes on KPIs, entrance motion on live rows.
+
+---
+
+## 10. Phase 4 — Professional hardening & visual redesign (proposed)
+
+> **Status:** approved 2026-09-24 with every recommendation in §10.5. Stages G, J, K, L, H and M delivered, plus a theme v3 overhaul (§10.6); Phase 4 complete, Stage M awaiting review. Stages G–M keep §7's review-stop discipline.
+> **Inputs:** the Phase 1 takeover audit (2026-09-23: gates, live and synthetic runs, py-spy profile) and a real-GPU screenshot review of every route at 1440×900 and 390×844.
+
+### 10.1 Why
+
+**Technical (verified at runtime unless noted):**
+
+| # | Finding | Evidence |
+|---|---|---|
+| 1 | The 1 Hz HGB `predict_proba` runs on the event loop (`ml/engine.py:317`); under CPU load sklearn's OpenMP regions stall the loop for seconds | py-spy: 86 % of loop samples; `/health` 7.8–19 s; 3 Binance keepalive disconnects in 20 min; one REST call took 27.8 s; a "database is locked" failure lost 7 predictions |
+| 2 | `get_db` commits after the response has been sent | 204 at +30 ms, commit at +547 ms; this is the e2e strategy-delete failure |
+| 3 | Every retrain (and every HMM refit) runs twice | v12→v13 21 s apart; the same for v10→v11 and v14→v15 |
+| 4 | The backtester applies stops/targets to the entry bar's pre-fill range | filled at 100.00, stopped at 99.80 on the same bar |
+| 5 | Stale history is spliced into live state (bar ring, ML history) | a 98.8 h gap inside the "last 10 minutes" chart |
+| 6 | The replay loop repeats trade ids, which the frontend then drops | 76 of 123 trade frames dropped after the first loop |
+| 7 | `regime_quiet` never exits during `trending`; alert templates use unvalidated `str.format` | contradictory UI; an AttributeError and a 50 MB message reproduced |
+| 8 | ML honesty gaps: permutation importance is in-sample and scored on accuracy but labelled "log-loss"; fold metrics describe the uncalibrated model, not the served calibrated one; early stopping validates on a random split; SHAP explains a different model | `ml/train.py:168-208`, `components/intelligence/panels.tsx:93` |
+| 9 | Book metrics are recomputed on every diff (O(levels), ~7 % of loop time); the SHAP explainer is built on the loop (629 ms); bcrypt runs inline (190 ms) | py-spy, timings |
+| 10 | Unauthenticated mutations; backtests with no concurrency cap; `predictions` and `alert_history` never pruned; four endpoints untyped (hand-written TS) | code read |
+
+**Visual (from the real-GPU screenshots):**
+- **Background noise.** The high-tier flow field draws worm-like trails and red/green blotches across every page. On sparse pages (Strategies, Alerts) it covers ~70 % of the screen and reads as dirt rather than depth.
+- **Illegible hero.** The terrain is a tilted, cropped slab that leaves ~40 % of its panel empty. It uses saturated teal and red over whole areas, has no price, time or depth axes, and its particles render as blurry blobs. It also sits as a black rectangle inside a glass panel.
+- **Decorative colour.** Numbers are coloured by channel rather than meaning (spread in pink, "−0.000 bps" in coral, tick flashes recolouring KPIs).
+- **Weak hierarchy.** Every panel carries uppercase letter-spaced micro-labels plus a long subtitle ("cumulative depth · adaptive ±band × 19 s · buys lift off, sells rain in"). Primary and secondary information barely differ.
+- **Layout holes.** Unequal panel heights leave gaps (Signals, depth curve, Liquidity), and /book has duplicate chip rows. Strategies and Alerts are two small cards on an empty page. On mobile the terrain panel overflows the viewport and the nav scrolls off-screen.
+- **Chart scaling.** The depth curve shrinks one side to a sliver. One 16.2 log-loss outlier flattens the walk-forward chart. Strip labels overlap the lines, z-score bands render as flat blocks, and the registry list is clipped.
+- **Undesigned states.** Warm-up shows as "calibrating" chips on 4 of 6 KPIs and "—" everywhere else.
+- **No elevation.** Every surface sits on the same tier, so the glass reads as plain dark cards.
+
+### 10.2 Technical workstream
+
+**T1 — Real-time isolation: the feed never waits on anything.**
+- Inference moves to a dedicated single worker thread under `threadpoolctl.threadpool_limits(1)`. Bar close submits and returns; a late result is published late or dropped, never queued behind the next bar.
+- Training and HMM fitting move to a spawned worker process: single-flight, capped BLAS/OpenMP threads, with a timeout. Artefacts are written there and the engine only swaps them in. The "training due" state is updated at submit time, so runs can't double. The SHAP explainer is built in the worker at train time.
+- Book: each diff does only O(1) work (apply levels, accumulate OFI). Metrics and the depth profile are computed at most at 10 Hz and at bar close, via a dirty flag. The local book is pruned beyond the snapshot band, which bounds both memory and scans.
+- bcrypt and other CPU-bound calls run via `asyncio.to_thread`.
+- A 10 Hz event-loop-lag sampler is exported as a metric. Health splits into `/health/live` and `/health/ready` (ready = migrated, book synced, loop lag within bounds). Feed staleness (no event for N s) is pushed to the UI.
+
+**T2 — Data correctness.**
+- Commit before the response is sent, using a function-scoped session dependency, with a read-after-write regression test.
+- Session-aware history:
+  - Gaps longer than N s split the history into segments.
+  - The live bar ring is preloaded only when that history is fresh; otherwise charts start from a "resumed after gap" marker.
+  - ML features and labels never straddle a gap, and the embargo is measured in time, not index.
+- Writers: the prediction store re-queues on failure, as the bar writer already does. Multi-row inserts are chunked. `predictions` and `alert_history` get retention, plus a periodic `PRAGMA optimize`.
+- Replay: trade ids stay monotonic across loops at the source, and the frontend dedupe resets on snapshot.
+- Backtester:
+  - Stops and targets apply only from the bar after the fill.
+  - History loads in chunks.
+  - Lookback is capped and a semaphore limits concurrent runs.
+  - README fill wording corrected.
+- Signal and alert semantics: `regime_quiet` exits when the regime leaves quiet. Alert templates use a safe formatter: only `{value} {threshold} {field} {symbol}`, with bounded format specs, validated on create and update.
+
+**T3 — ML rigor: evaluate what we serve.**
+- Each walk-forward fold trains *and calibrates* inside its training window (inner time split), then scores the calibrated model on the held-out fold. Add a reliability curve and a Brier decomposition per fold. Regularise the logistic baseline so it stops producing outliers.
+- Early stopping validates on a time-ordered tail of each training window.
+- Permutation importance runs on held-out data with the fold model and is scored on log-loss, matching what the UI says.
+- SHAP comes from the served ensemble's base models (averaged) and is labelled as such.
+- A model manifest (feature-schema hash, horizon, label parameters) is checked on load, and the registry id is restored on restart.
+- Quantity features are normalised per symbol by a rolling median, so the "scale-free" claim becomes true.
+- Regime splits into two honest axes: **volatility state** (calm / normal / elevated / extreme, from the HMM) and **direction** (down / flat / up, from the drift statistic). "Trending" is used only when the direction is significant.
+
+**T4 — API & security.**
+- Response models for the feature catalog, system metrics, market stats and backtest trades, leaving zero hand-written TS types.
+- Errors as RFC 9457 problem+json; pagination on history endpoints.
+- Security:
+  - Reads stay public; mutations require authentication (D4). Registration is off in production.
+  - CORS is limited to configured origins, and the rate-limit key comes from a trusted proxy only.
+  - Mutations and backtests get per-route limits.
+  - The WebSocket gets a connection cap and an origin allowlist.
+
+**T5 — Observability & operations.**
+- A Prometheus `/metrics` endpoint covering:
+  - event-loop lag, event rate and exchange→receive latency;
+  - WS clients, backlog and drops;
+  - writer queue depths;
+  - training duration and inference latency;
+  - DB errors.
+- De-duplicate the repetitive socket-error log lines.
+- Shut down in a defined order with final flushes. Document deployment for the chosen persistence (D5).
+
+**T6 — Engineering quality.**
+- A regression test per audit finding; property tests (hypothesis) for book sync, rings and bars; coverage reporting with a floor.
+- E2E runs against the standalone server with a pre-warmed, seeded synthetic DB (fast and deterministic). It adds a forced-mid-tier WebGL project, visual-regression baselines and axe accessibility checks.
+- CI publishes coverage and Playwright artifacts, keeps separate Docker cache scopes, and enforces Lighthouse budgets on non-3D routes.
+- Repo hygiene:
+  - `.gitattributes` (LF line endings);
+  - pre-commit hooks (ruff, eslint, prettier) and `justfile` tasks;
+  - a dependency-update bot;
+  - dead settings removed and stale docs fixed;
+  - `ARCHITECTURE.md` with short ADRs, and a `CHANGELOG.md`.
+
+### 10.3 Visual workstream
+
+**Direction: "calm terminal".** Dense and legible like a professional trading terminal, finished like a premium product. Colour carries meaning only; motion follows the data and never decorates; glass is reserved for things that float.
+
+**V1 — Design system v2.**
+- **Surfaces:** a five-step, slightly cool graphite ramp with 1 px hairlines and a faint top highlight, in three elevation tiers. Frosted glass only on the header, overlays, popovers, palette and tooltips.
+- **Colour:**
+  - Bid teal and ask rose, re-tuned (slightly desaturated, still separable under colour-vision deficiency), each in three intensities; mid in amber.
+  - One neutral-blue accent for interaction, kept separate from market semantics.
+  - Muted regime hues; text in four levels that all meet AA contrast.
+- **Type:**
+  - Geist Sans on a fixed scale (12/13/14/16/20/24/32) with sentence-case labels.
+  - Geist Mono only for numerals and tables, with tabular figures.
+  - Units smaller and muted; no negative zero; consistent precision per instrument.
+- **Grid:** 4-pt spacing and a 12-column bento with fixed row heights so panels align. One panel anatomy everywhere: title, inline meta and actions; body; optional footer.
+- **Components:**
+  - Panel, and Stat (value, unit, delta, sparkline, z-badge).
+  - Badge, SegmentedControl, Tabs, Button and IconButton.
+  - Field, Select, Switch and Slider.
+  - DataTable with a sticky header, numeric alignment and row hover.
+  - Tooltip, Drawer and Skeleton.
+  - Designed empty and warm-up states: a progress ring with ETA replaces the "calibrating" chips.
+- **Charts:** one theme shared by lightweight-charts and the custom canvases, covering grid, axes, crosshair, tooltip, legends and gap markers.
+
+**V2 — App shell.**
+- **Top bar:**
+  - Brand, and a nav with an animated active indicator.
+  - A market ticker: symbol switcher, last price with tick flash, session change, spread.
+  - Connection health (source badge, latency, feed status) and ⌘K.
+- **Status bar:** a thin bar along the bottom (events/s, loop lag, model version, last bar time), the terminal cue.
+- **Background:** the flow-field trails go. What stays is a quiet regime-tinted vignette with a fine grid and grain, which moves subtly only when the regime changes.
+- **Mobile:** a compact header, a bottom tab bar, and single-column panels that never overflow.
+
+**V3 — Dashboard.**
+- A market strip of six Stats with sparklines.
+- A hero panel with a **Heatmap | Terrain** switch (D2):
+  - The Heatmap is the legible default: Bookmap-style price × time liquidity, drawn as a WebGL texture with trade bubbles and a price axis.
+  - The Terrain is reworked: camera fitted to its bounds, a floor grid, price/time/depth axes, depth-graded colour, crisp particles, and a crosshair tooltip that follows the displaced surface.
+- A price chart with volume, VWAP and microprice overlays, a crosshair, and session-gap markers.
+- A model card: probability bar with a calibration note, plus a drift sparkline.
+- Regime shown as a timeline ribbon over the last N minutes, replacing the four percentage bars.
+- A lower row of equal-height panels:
+  - order flow: OFI histogram plus cumulative OFI;
+  - signals: active list plus timeline;
+  - tape: size-scaled, aggregated prints.
+
+**V4 — Book.** A ladder with inline depth bars and heat, a depth chart on a symmetric clamped scale, liquidity bands as a compact chart, and the heatmap/terrain at full size.
+
+**V5 — Intelligence.**
+- A model card, a reliability diagram, and a fold chart with robust scaling.
+- A SHAP waterfall with human-readable feature names, alongside permutation importance.
+- The registry as a timeline table, a drift panel and a regime timeline.
+- The signal rules as a table with live state.
+
+**V6 — Strategies.** Three panes: a library; a builder that shows conditions as visual chips over the feature catalog; and a results tear sheet (equity and drawdown, KPIs, a filterable trade table). Templates appear as a gallery.
+
+**V7 — Alerts.** A rules table with inline enable toggles, the rule form in a drawer, and a history timeline with acknowledge.
+
+**V8 — Settings.** Sections with a side index.
+
+**V9 — Quality bar.**
+- Every interactive element has hover, focus, pressed and disabled states.
+- AA contrast throughout, and a clean axe run.
+- `prefers-reduced-motion` and the in-app motion setting both apply to CSS and to JS, via `data-motion` on `<html>`.
+- The low tier keeps the layout and swaps WebGL for 2D.
+- Before/after screenshot sets at 1440×900 and 390×844, on a real GPU.
+
+### 10.4 Stages
+
+| Stage | Scope | Reviewable outcome |
+|---|---|---|
+| **G — Runtime isolation & correctness** | T1, T2, regression tests | Loop p99 < 20 ms while training under CPU load (latency probe + py-spy); e2e 14/14; every audit defect has a test that failed before the fix and passes after |
+| **H — ML rigor & regime semantics** | T3, typed contracts (first half of T4) | Walk-forward numbers for the served model, reliability data, honest importance; no hand-written TS types |
+| **J — Design system v2 & shell** | V1, V2, plus a restyled dashboard as the **direction check** | Screenshots signed off before the rollout |
+| **K — Dashboard & Book** | V3, V4, including the heatmap and the terrain rework | Before/after set; 60 fps on the Iris Xe; low-tier fallback verified |
+| **L — Remaining pages, responsive, a11y** | V5–V9, visual-regression baselines | All routes redesigned; axe clean; mobile verified |
+| **M — Security, ops, hygiene** | Rest of T4, T5, T6 | `/metrics`, auth on mutations, CI/test/docs upgrades all green |
+
+**Proposed order: G → J → K → L → H → M.**
+- G goes first because the loop stalls also make UI verification unreliable.
+- The visual stages come next because they are the most visible gap.
+- H can move before L if the redesigned Intelligence page should show the new metrics from day one.
+
+### 10.5 Decisions needed
+
+| # | Question | Recommendation |
+|---|---|---|
+| D1 | Stage order | G → J → K → L → H → M |
+| D2 | Dashboard hero | Heatmap by default with a Terrain toggle; the terrain also full-size on /book |
+| D3 | Ambient background | Keep a quiet vignette/grid; remove the flow-field trails and motes |
+| D4 | Auth model | Reads public; mutations behind a single admin token in production (the JWT login stays available) |
+| D5 | Hosted persistence | SQLite locally; Postgres via `DATABASE_URL` for the hosted backend (Render's free disk is ephemeral) |
+| D6 | New dependencies | Backend: `threadpoolctl` (already transitive via scikit-learn), `prometheus-client`, `hypothesis` (dev). Frontend: `prettier`, `@axe-core/playwright` (dev). No new runtime UI library |
+
+### 10.6 Delivery log
+
+**Stage G — runtime isolation & correctness (2026-09-24).** Every item in T1/T2 was built, with a regression test for each audit finding (backend tests 87 → 116; Vitest 10 → 11). Two of the tests were checked against the old behaviour, reintroduced temporarily, and failed as expected: request-scoped commits, and stops on the fill bar.
+
+Measured on the Iris Xe laptop, live Binance feed, while a model retrained:
+
+| Condition | `/health` p50 / p99 / max | Before Stage G |
+|---|---|---|
+| Training, normal desktop load | 2.3 / 12.7 / 137 ms | p99 297 ms, max 410 ms |
+| Training, all 8 cores saturated by burner processes | 3.0 / 48 / 121 ms | 3–19 s stalls, keepalive disconnects |
+
+- py-spy under the saturated load shows the event-loop thread busy for ~7 % of samples. Its largest remaining cost is the 5 Hz depth-profile scan; predictions run on the `infer-*` thread.
+- The 20 ms p99 target holds while training under normal load. With every core deliberately saturated, p99 is 48 ms: OS scheduling contention across 14 runnable threads, not work on the loop.
+- Playwright: 14/14.
+
+Additions and deviations, all deliberate:
+
+- **Spawned-process start runs off the loop.** On Windows, `Process.start()` writes the pickled arguments (megabytes of training data) into the child's pipe and blocks until the still-importing child reads them. Found during the build as multi-second loop stalls.
+- **Unpaced sources are lossless.** Replay and synthetic at speed 0 put the intelligence tier into FIFO mode with backpressure (`yield_to_consumer`), so every bar is predicted. Real-time feeds keep latest-bar-wins.
+- **The OpenMP limit is process-wide with MSVC's vcomp on Windows** (per-thread with libgomp on Linux). This is harmless: nothing else in the server process uses OpenMP once training runs in its own process. Documented in `core/workers.py`.
+- **The SHAP explainer is built on the inference thread when a model is installed**, not inside the training process. Explainer objects are not reliably picklable; it is still never built on the loop.
+- **The embargo stays index-based.** Sessions are split at gaps, and there is at most one sample per bar, so an index distance never exceeds the time distance: the index embargo is at least as strict as a time embargo. A test asserts that every feature and label window stays inside its session.
+- **The "resumed after gap" chart marker moves to Stage K** (the chart redesign). The backend no longer splices, and charts start fresh after an outage longer than `BAR_RESUME_MAX_GAP_S`.
+- **One V9 item pulled forward.** Detected software renderers open the terrain panel on the 2D curve: SwiftShader compiles the terrain shaders on the main thread, a 28 s freeze. The 3D toggle stays.
+- **E2E per-test budget raised from 90 to 180 s.** A trace showed the software-rendered dashboard blocks on "GPU backpressure": accelerated 2D canvases and every panel's backdrop blur are rasterised on the CPU. It takes 60–100 s there against ~2 s on a GPU. Restricting glass to floating elements in Stage J (V1) removes most of those blur layers.
+- **Startup rebuilds ML history in a thread**, and the loop-lag monitor starts once startup is done.
+- **HMM fits now also run in the worker process.** They are single-flight too: the same done-callback race had produced duplicate "v4" fits.
+
+**Stage J — design system v2, app shell, dashboard direction check (2026-09-24).** V1 and V2 were built, and the dashboard was restyled on them. This is the direction check: the rest of V3 (heatmap, terrain rework, regime ribbon, aggregated tape) is Stage K, and the other pages are Stage L.
+
+- **Tokens** (`app/globals.css`, mirrored in `lib/theme`):
+  - A graphite surface ramp: page, panel, raised, control, active.
+  - Four ink levels, all ≥ 4.9:1.
+  - Bid, ask and mid, each with a mark colour and a text colour.
+  - One interaction accent; the status scale good/warning/serious/critical; a one-hue violet regime ramp (regime is ordinal).
+  - A type scale of 11/12/13/14/16/20/24/32, plus radii.
+  - Every palette decision was run through the dataviz validator. Bid/mid/ask pass all pairs (worst CVD ΔE 10.5, normal-vision ΔE 18.5); the regime ramp passes the ordinal checks. The old palette failed the lightness band, which is why it looked harsh.
+- **Components:**
+  - `app/ds.css` is the component layer. `components/ds` holds Panel, Button, Badge, ZBadge, Input, Select, Textarea, Field, Switch, SegmentedControl, Divider, Tooltip, Kbd, Skeleton, ProgressRing and Stat. `glass.css` and the `Glass*` components are gone.
+  - Glass (`.float`) is now only on the app bar, menus, palette, toasts and tooltips. Panels are solid.
+  - Text stays in ink; tone is carried by dots, tints and marks.
+- **Shell:**
+  - The app bar holds the brand, a nav with a sliding indicator, and a market ticker (symbol, tweened mid with tick flash, 5-minute change, spread). It also shows feed health and ⌘K.
+  - A terminal-style status bar: ev/s, loop p99, book state, model, last bar, RTT, clock.
+  - A bottom tab bar on mobile.
+  - A regime-tinted vignette with grid and grain replaces the flow field. The tint cross-fades through a registered `--regime` property.
+  - `data-motion` on `<html>` makes the in-app motion setting reach CSS as well as JS.
+- **Dashboard:**
+  - A 12-column grid with equal-height rows.
+  - A market strip of six Stat tiles with 5-minute sparklines, z-badges and a 5-minute delta on mid.
+  - A model card with a warm-up ring and ETA; regime on the ramp.
+  - An order-book card with a depth curve and touch read-outs, and a live Switch.
+  - A tape with side dots; signals with a designed empty state.
+  - Order-flow and session strips.
+- **One chart theme for every chart** (`CHART`): hairline grids, 2 px lines, 10 % washes, an accent crosshair and DOM labels.
+  - Signed series (OFI, imbalance) split bid-above / ask-below at zero.
+  - Strip and depth curve now redraw on resize (previously only on the next bar) and have a hover read-out.
+  - Price labels use thousands separators.
+  - Microprice is a neutral line. The z-strips hold a ±3σ minimum scale and shade the |z| ≥ 2 tails.
+- **Checks, all green:**
+  - Frontend: tsc, eslint, Vitest 11 → 12, `next build`, npm audit.
+  - Backend: ruff, mypy, pytest 116 → 117, pip-audit; OpenAPI current.
+  - Playwright 14/14 in 2.2 min. The dashboard test now takes 3–6 s on SwiftShader, down from 60–100 s: the per-panel blur that caused the GPU backpressure is gone. The two tests that had raced passed three more repeats each.
+  - Real-GPU captures at 1440×900 and 390×844 on every route: no console errors, no horizontal overflow.
+
+Deviations:
+
+- **Two hydration races, found by e2e** (React #418, intermittent on SwiftShader, where hydration takes seconds). Both were reproduced against the dev server's hydration diff, fixed, and re-probed clean over 24 loads:
+  - The bar table is mutated outside React. When bars had already landed before `MarketStrip` hydrated, the sparklines and deltas rendered data where the server HTML had none. `useBars` now hands out an empty table until `barsHead` moves; a Vitest case fails without the fix.
+  - The new status bar in the layout polls `/system/metrics`, and the Settings page hydrates later with that query already cached. `useSystemMetrics` reports no data until hydration is done (`useHydrationDone`).
+- **The status bar judges bar freshness by arrival time, not event time** (`lastBarAt` in the store), as the server's feed watchdog does. Replay's historical timestamps would otherwise always read as stale.
+- **Backend fix: synthetic pacing drifted** (found through the new status bar). The paced source slept a fixed 100 ms *after* each step's work, and Windows' ~15.6 ms timer granularity stretched every sleep. Event time lost ~20 % against the wall clock, 22–25 s after three minutes and growing, so every synthetic-mode time axis was off. It is now paced against a deadline; the lag holds at ~1 s. A regression test fails on the old loop (6.5 s of event time where 20 s were due) and passes on the new one.
+- **The tape does not flash per print.** At the synthetic feed's ~100 trades/s the 20 visible rows turn over several times a second, so a per-row flash tinted the whole tape. Aggregated, size-scaled prints are Stage K.
+- **Other pages got only what the new system needed to render correctly:** retired `glass`/`chip`/`live-dot` classes replaced, PageHeader tiles, and signal-priority tones aligned. Their redesign is Stage L. Known leftovers for L: Settings uses bid/ask as good/bad tones, and there are raw `text-[11px]` sizes.
+
+
+**Stage K — dashboard and book (2026-09-25).** Built V3 and V4 on the Stage J system: the hero, the terrain rework, and the rest of the dashboard and book panels.
+
+- **Liquidity hero, Heatmap | Terrain** (D2; heatmap by default).
+  - The heatmap plots price × time over 3 minutes of book frames. Each cell is the quantity resting in that price bin: the server's full-book depth profile, differenced, and placed at absolute prices using each frame's mid. This makes resting walls horizontal lines that price moves through.
+  - Overlays: the mid trail, and trade bubbles at each column's VWAP with area ∝ traded quantity. There are price and time axes, and a hover read-out of price, age, resting size and trades.
+  - Bins are interpolated between their centres, so levels don't speckle as the mid moves. The vertical span follows the price trail up to 2.5 bands; beyond that, older prices scroll out.
+- **Terrain rework.**
+  - The camera distance is fitted to the terrain's bounds, with room left for its labels.
+  - A floor grid, plus price (bps and mid), time and depth axes as projected DOM labels.
+  - Colour is graded by depth, and the surface fades with age instead of darkening into a slab. Particles are crisp discs with normal blending.
+  - The crosshair ray-marches the height field on the CPU, using the shader's own height mapping, so it lands on the displaced surface rather than the flat plane beneath it.
+- **Price chart.**
+  - A volume histogram, each bar coloured by its net aggressor side.
+  - Session gaps break the lines and carry a "gap N s" marker (deferred from Stage G).
+  - The chart opens on the ring's full 10-minute window, right-aligned.
+- **Model card:** one down | flat | up probability bar. The note says what the probability means (the first barrier touched within the horizon) and how it is calibrated (on embargoed time splits), with a link to the reliability curve. The footer adds a drift sparkline: rolling log-loss over 30 predictions against the class-prior baseline.
+- **Regime:** a ribbon of per-bar regime over the ring on the ordinal ramp, with share-of-time and a hover range. It replaces the four probability bars. It needed one backend addition: a `regime` ordinal code column on streamed bars. Regime is persisted per bar, so history loads too. The OpenAPI contract is unchanged (bar columns are data).
+- **Lower row:**
+  - Order flow: an OFI histogram and cumulative OFI as two strips (no dual axis).
+  - Signals: a per-rule activation timeline over 10 minutes of event time, seeded from `/analytics/signals` history and extended live, above the active list.
+  - Tape: fills from one taker sweep (same side, within 100 ms of the group's newest fill) merge into a print at their VWAP. Size bars are on the aggressor's colour, scaled to the 90th percentile; prints of 2× or more are emphasised. The trade buffer grew from 200 to 1,000 fills so the aggregated tape stays full.
+- **Book page.**
+  - The hero at 520 px.
+  - The depth chart moved to the full-book profile. The old top-50-level version covered under 1 bps of BTC's 0.01-tick book, so on the live feed it was a wall at mid and then flat. Its scale is symmetric, and the y-axis is clamped at 2.5× the thinner side, with a clipped side showing its total.
+  - A ladder with size heat and cumulative bars; walls (≥ 3× the median) are emphasised.
+  - Liquidity bands (±5/±10/±25 bps) as a compact bar chart, followed by the book-shape figures.
+- **Measured** on the Iris Xe (headless Chromium, D3D11), final build, live Binance feed:
+  - 60 fps, p99 frame 16.8 ms, no frames over 33 ms and no long tasks, on `/` and `/book` in both heatmap and terrain views.
+  - The same with a full 3-minute heatmap (900 columns). The Stage J baseline was also 60 fps.
+- **Fallbacks verified:**
+  - SwiftShader (low tier): the heatmap renders, and the terrain stays opt-in (first frame 8.9 s after the switch, against 28 s for the old terrain).
+  - WebGL disabled: the heatmap renders and the Terrain option is hidden.
+  - In-app reduced motion: `data-motion="reduced"`, and the particles are off.
+  - No console errors in any of the three.
+- **Checks, all green:**
+  - Vitest 12 → 18: HeatRing differencing and trade folding, anchored sweep aggregation, cumulative. The anchoring test fails on the chained version.
+  - pytest 117 → 118: the regime code column.
+  - ruff, mypy, pip-audit, tsc, eslint and `next build` clean.
+  - Playwright 14/14; dashboard and book tests passed three more repeats.
+  - Dev-server hydration probe clean over 18 loads.
+
+Deviations:
+
+- **The heatmap is Canvas 2D image data, not a WebGL texture.** At ≤ 900 × 240 cells it rasterises in a few ms once per book frame, needs no shader compile, and is the same view on every tier.
+- **Bugs found while verifying, fixed with the stage:**
+  - The depth curve's top-N data (above).
+  - The price chart kept the bar spacing it fitted to a half-filled ring after a backend restart, showing seconds instead of minutes.
+  - The tape's first grouping chained same-side fills into a few giant prints.
+- **Known limits:**
+  - Heatmap history is client-side, so it fills in over 3 minutes after a page load (the page says so).
+  - The terrain still costs a ~9 s shader compile on software renderers, which is why it stays opt-in there.
+
+**Stage L — remaining pages, responsive, accessibility (2026-09-26).** V5–V9 are built. Every route is on the design system, axe-clean at desktop and mobile, and pinned by visual baselines.
+
+- **Design system:**
+  - A `Drawer`: a modal side sheet with focus moved in, Tab trapped, Esc and the backdrop to close, scroll locked, and focus returned to the opener.
+  - `TableWrap` + `.data-table`: a focusable, named scroll region, sticky header, numeric alignment and row hover.
+  - Condition chips, a slider style, and pressed or disabled states on every interactive primitive that lacked them.
+  - Tooltips can anchor to the trigger's end. Panel headers wrap on narrow screens.
+- **Intelligence (V5):**
+  - Drift monitor on the chart theme (`MiniSeries` rewritten: DOM axes and legend, labelled reference levels, hover read-out).
+  - A **reliability diagram of the live predictions**: class-wise or pooled, with calibration error, Brier score and a histogram of predicted probabilities. Training-time reliability does not exist yet (T3).
+  - SHAP as a waterfall from the base value to the prediction, with readable feature names and values in units (a label map for all 47 model features). Permutation importance as a bar list.
+  - Walk-forward folds as a dot plot on a robust scale (baselines far outside are pinned to the edge with their value), with a fold table.
+  - The registry as a timeline table; signal rules as a table with live state and time held.
+- **Strategies (V6):** three panes at ≥ 1280 px (library · builder · results).
+  - Library: saved strategies (searchable) and quick-start templates; the template gallery is the empty state.
+  - Builder: conditions as chips (feature ▸ operator ▸ value), and/or groups, and a searchable feature-catalog drawer that adds to the chosen block.
+  - Tear sheet: eight KPIs, equity and drawdown in **two panes on one time axis** (the old chart used two scales on one plot), and a trade table filtered by side, outcome and exit reason.
+- **Alerts (V7):** a rules table with inline, named toggles; the rule form in the drawer (a real form, so Enter submits); history as a day-grouped timeline with acknowledge.
+- **Settings (V8):** sections with a sticky side index that follows the section in view. The tier copy now matches Stage K, and status tones replace bid/ask.
+- **Quality (V9):**
+  - `@axe-core/playwright` 4.13.0 (D6) and `e2e/a11y.spec.ts`: WCAG 2.2 AA on every route and on both drawers.
+  - The baseline scan found five violation types: warming z-badge contrast, ladder heat-cell contrast, unlabelled canvases, a keyboard-unreachable scroll region, and a nameless switch. The redesign fixed those, and the new scans found five more, all fixed:
+    - faint text on selected rows;
+    - a 16 px target;
+    - an alert role on a list;
+    - status-coloured text in the status bar (it failed contrast whenever the loop lagged);
+    - the active-signals scroller.
+  - `e2e/visual.spec.ts`: 12 baselines (6 routes × desktop and mobile). The page is pinned to one state: WebSocket accepted but silent, REST unanswered, frozen clock, UTC, reduced motion. They passed 24 of 24 on a repeat run. They are Windows baselines, so other platforms skip them.
+  - Mobile: every route lays out at exactly 390 px. The earlier "no overflow" checks compared the page with a viewport that emulation had widened to fit it, which hid a 431–546 px layout. The causes were invisible tooltips and panel headers that didn't wrap.
+- **Honesty fixes found on the way:**
+  - The importance panel said "out-of-sample log-loss increase". It is the accuracy drop, on a fold the measuring model was trained on, so the panel now says so (T3 fixes the computation).
+  - SHAP is labelled as explaining the uncalibrated model.
+  - Sharpe and Sortino over under a day are labelled "not meaningful yet".
+  - The tape no longer claims "50 % bought" before any fill.
+- **Checks:**
+  - Vitest 18 → 22 (reliability, condition helpers).
+  - Playwright 14 → 34 (8 accessibility, 12 visual), all passing.
+  - tsc, eslint and `next build` clean. Backend unchanged (pytest 118).
+
+Deviations and limits:
+
+- **The reliability diagram uses live resolved predictions** (the drift window, ≤ 300), not held-out folds. Per-fold reliability comes with T3.
+- **The three-pane strategies layout starts at 1280 px**; from 1024 px the results stack under the builder.
+- **Visual baselines exist only for Windows.** A Linux set for CI belongs with the seeded, deterministic e2e database in Stage M (T6).
+
+**Theme v3 — "midnight glass" dark theme (2026-09-26).** A full visual overhaul of the dark theme after the Stage L review found v2 dull. Same component names and structure; new tokens, surfaces and chrome.
+
+- **Palette:** a navy ramp (page `#060911` → active `#243049`) replaces graphite. Inks and market colours were re-validated against it.
+  - bid/ask/mid pass all-pairs: worst CVD ΔE 11.6, normal-vision ΔE 18.7, all ≥ 3:1.
+  - The regime ramp passes the ordinal checks.
+  - Every text ink and `*-text` step clears 4.5:1 on all surfaces up to "active".
+  - Status colours are brighter but still reserved.
+- **Surfaces:**
+  - Panels have a gradient body inside a lit edge (a border-box gradient, brightest along the top), a header divider and a section-icon chip in the brand gradient (accent → violet).
+  - Controls sit in wells. Selected and primary states are lifted and lit in the accent.
+  - Badges are pills with glowing dots.
+- **Ambient:** an aurora (brand blue, the live regime colour, a trace of bid teal) drifts on a 48 s composited transform over a night gradient, grid and grain.
+- **Components:**
+  - Stat tiles: an eyebrow label, a 28 px value, a direction delta pill, accent sparklines with fading fills.
+  - Charts: canvas and lightweight-charts areas fade to their baseline; the price mid is an area.
+  - Heatmap: the ramp's low end is lifted (gamma 0.8 → 0.65) so the resting book reads on navy.
+  - Shell: brand mark and gradient wordmark, an active-route pill, a glowing slide indicator, page eyebrows, and a 26 px title.
+- **Fixed on the way — the glass never frosted.** `.float` declared `backdrop-filter` and `-webkit-backdrop-filter`. Lightning CSS kept only the prefixed one, which Chrome ignores, so the app bar, palette, menus and tooltips had no blur (in v2 as well). Only the unprefixed property is declared now, and the build adds the prefix.
+- **Fallbacks:**
+  - `data-tier` on `<html>`: on the low tier, floats go near-opaque with no blur and the aurora and live ring stop looping.
+  - Reduced motion flattens both, as before.
+  - Verified by computed styles on a real GPU, SwiftShader and reduced motion.
+- **Checks:**
+  - axe clean at 1280 and 390 px on every route and both drawers (synthetic), plus the dashboard, book and intelligence on live data.
+  - No overflow at 390 px.
+  - Frame rate on the Iris Xe, production build: 58–60 fps with p99 16.8 ms in most runs. An A/B test against removing panel shadows, blur, drift or the ambient layer showed no measurable cost; run-to-run noise is equal in every variant.
+  - Visual baselines re-recorded (20/20 on a repeat run). Playwright 34/34, Vitest 22, tsc, eslint and build clean. Backend and API unchanged.
+
+**Stage H — ML rigor and regime semantics (2026-09-26).** T3 plus the typed-contract half of T4. The model is now evaluated exactly as it is served, and every number the Intelligence page shows means what its label says.
+
+- **Evaluate what we serve** (`ml/train.py`). One recipe, `fit_model`, builds both the served model and every walk-forward fold model:
+  - Boosted trees whose early stopping validates on the time-ordered last 15 % of the training window, after an embargo. Before, it validated on HGB's random split, which interleaves with the fit rows. A test spies on the fit to prove the split.
+  - Calibration on embargoed time splits of the same window (`TimeSeriesSplit(3, gap)`, one calibrated tree model per split, averaged). Isotonic from 1,000 samples, sigmoid from 400, none below.
+  - Every fold runs the recipe inside its own training window and is scored on the fold it never saw.
+- **What each fold reports** (`ml/evaluation.py`):
+  - log-loss, calibrated and raw;
+  - accuracy;
+  - the multiclass Brier score with Murphy's reliability / resolution / uncertainty terms (a test pins the identity);
+  - a reliability curve (10 bins per class; folds pool exactly);
+  - the same scores for the class prior and a logistic baseline. The baseline is now regularised (C = 0.1, inputs clipped at ±5σ), so heavy-tailed features no longer throw it off the chart.
+- **Importance.** Permutation importance runs on held-out folds, with each fold's own served model, scored as the rise in log-loss (mean ± s.d.). The last two folds are used, with at most 1,500 rows each and 3 repeats, to bound the cost. The panel now says exactly this. Before, it was in-sample accuracy labelled as log-loss.
+- **SHAP** explains the served ensemble: the tree models' raw log-odds for the class the *calibrated* model predicts, averaged over the tree models. It is labelled so, and a test checks additivity against the models' margins. The explainers are built one per inference-thread task, so a prediction waits behind at most one.
+- **Manifest.**
+  - Every artefact records the feature-schema hash (names plus a schema version), the lookback, the label horizon and barrier parameters, and the class order.
+  - On load a mismatch is refused and retrained. The refused version number is still claimed, so the next model doesn't overwrite it.
+  - The registry id is restored on restart, looked up by artefact path, because versions repeat across data sources.
+- **Scale-free quantities.** Nine count, volume, order-flow and depth features are divided by their symbol's rolling 30-minute median. The median uses positive values only, kept in a sorted list beside a FIFO, and resets at session gaps. A test shows the feature vector is identical when every size is ×1000.
+- **Regime split** into two honest axes:
+  - **Volatility state.** The HMM's labels always came from each state's mean volatility z, so they are renamed for what they measure: calm / normal / elevated / extreme. The fallback now uses the same cut-points.
+  - **Trend** (down / flat / up). The drift of 2 minutes of 1 s returns as a t-statistic with a Newey–West standard error (lag 5), since 1 s returns are autocorrelated. It enters at |t| ≥ 2 and releases below 1.5. "Trending" appears only then.
+  - Bars carry a `trend` code. The backtester recomputes the trend from closes with the same statistic, so older history qualifies.
+  - Signals: *Extreme volatility*, *Calm market*, *Trending up*, *Trending down*.
+  - Alembic migration `4c1e7b2a9d30`:
+    - adds `market_snapshots.trend`;
+    - renames stored labels;
+    - rewrites saved strategies' regime conditions.
+    - Tested in pytest and on a copy of the dev database: up, `alembic check`, down, up.
+- **Typed contracts.** Response models for symbols, the feature catalog, market stats, system metrics (with nested source / book / ML / WS / loop models), backtest trades and reliability curves. `hooks.ts` declares no response shape by hand.
+- **UI:**
+  - Regime panel: a volatility-state ribbon and a separate trend ribbon with a t-gauge (the ±2 zones marked).
+  - Walk-forward: calibration method and raw log-loss per fold, plus the Brier terms.
+  - Reliability: a Held-out / Live switch; held-out is the default, from the pooled fold curves.
+  - SHAP and importance captions describe the new computations.
+  - Tick labels no longer repeat on narrow ranges.
+- **Result on live BTC (5 s horizon) — the model has no edge.** The first honest run:
+  - v35: held-out log-loss 0.808 against the prior's 0.762 (edge −0.045). It beat the prior in 1 of 4 folds.
+  - v39: edge +0.001, 2 of 4 folds.
+  - Calibration helps (raw → calibrated gains 0.04–0.31 nats) but can't create resolution. The Brier resolution term is ≈ 0.005 against reliability 0.05–0.07.
+  - The prior's own log-loss falls from 0.93 to 0.34 across folds as the flat share grows: the class mix drifts, and that is where the miscalibration comes from.
+  - The registry shows earlier versions were also negative on live data (−0.2 to −0.3 under the old, uncalibrated fold scoring). The page now says so plainly.
+  - Calibration isn't always a gain. On synthetic data, v45's calibrated fold log-loss was 0.672 against 0.612 raw (isotonic on short inner splits overfits). The walk-forward "Raw" column now exposes this rather than assuming calibration helps.
+- **Checks:**
+  - pytest 118 → 134. The suite runs in 76 s: modules that train in-process get the worker's thread cap. That cap is module-scoped, because held for the whole session it hangs the engine test on Windows.
+  - ruff, mypy, pip-audit clean. OpenAPI regenerated (36 paths, 85 schemas).
+  - Vitest 22 → 24. tsc, eslint and build clean.
+  - Playwright 34/34: Overview and Intelligence baselines re-recorded; visual and accessibility specs 20/20 on a repeat run.
+  - One full run had a flake: the backtest spec's 90 s wait for "completed" expired with the run at 100 %. It passed 2/2 in isolation and 34/34 on a full rerun.
+  - The suite took 8.6–12.5 min this afternoon against 4.2 min this morning, and tests that never touch the backend slowed as much. The e2e backend measured 0.2 % of one core at steady state, plus one ~22 s training (4 of 8 cores) at startup and about every 10 minutes. So the slowdown is load on this machine, not the app.
+  - axe clean at 1280 and 390 px with populated live panels. No overflow at 390 px.
+
+Deviations and limits:
+
+- **Regime labels changed name.** Saved strategies and stored bars are migrated. External consumers of the old labels (none in this repo) would need the same map.
+- **Permutation importance covers the two most recent folds**, not all four, to keep training under ~20 s at the 20,000-sample cap.
+- **Bars stored before this stage have no trend.** The ribbon leaves them blank; the backtester computes them.
+- **No edge on live data is a finding, not something fixed here.** Candidates for a later stage: a longer horizon, labels with a floor above the spread noise, and features that survive the regime drift.
+
+**Stage M — security, operations, engineering quality (2026-09-30).** The rest of T4, plus T5 and T6. This closes Phase 4.
+
+- **Access (D4):**
+  - Reads, including the WebSocket, stay public.
+  - Every mutation depends on `require_writer`. With `MUTATIONS_REQUIRE_AUTH` on (production by default) it needs `Authorization: Bearer <ADMIN_TOKEN>`, compared in constant time, or an active user's JWT. Covered: strategies, alert rules, backtests, acknowledgements.
+  - Production refuses to start without a ≥ 32-character `ADMIN_TOKEN`, and registration is off there.
+  - `GET /auth/access` says whether changes are gated and whether the caller passes. Settings → Access stores the token in that browser only; the API client sends it as a bearer header; a 401 names the fix.
+  - Verified live against a gated backend: read-only → the change is refused with that message → token saved → the change goes through → token forgotten.
+- **Transport:**
+  - CORS is limited to configured origins. The host-wide `*.vercel.app / netlify / onrender` pattern is gone (`CORS_ORIGIN_REGEX` is opt-in). Credentials are off (bearer tokens, never cookies), and methods and headers are enumerated.
+  - Forwarded addresses are believed only from `TRUSTED_PROXIES`, applied in the app with uvicorn's `--no-proxy-headers`. Before, `--forwarded-allow-ips=*` let any client choose its own rate-limit key.
+  - Per-client buckets: every request, writes (60/min) and backtest submissions (6/min).
+  - The WebSocket refuses foreign origins (403 handshake) and closes with 1013 beyond `WS_MAX_CLIENTS`.
+- **Errors and pagination:**
+  - Every error is RFC 9457 `application/problem+json` with the request id. Validation failures list their fields; unhandled errors never leak exception text.
+  - The OpenAPI document is rewritten so each error response is a `Problem`; no dangling refs.
+  - Alert history, backtests and the model registry are keyset-paged (`limit` + `before` → `items`, `next_before`); the alerts page loads older pages on demand.
+- **Observability (T5):**
+  - Prometheus `/metrics` from one collector over the stats the engine already keeps:
+    - loop lag, feed events, rate and resyncs;
+    - WebSocket clients, frames and backlog;
+    - writer queue, database errors and failed flushes;
+    - training and inference timings, model version;
+    - alerts and backtests.
+  - A feed-latency histogram (receive − exchange time) is the only hot-path instrument. It is empty on the synthetic source, which has no wall clock.
+  - Repeated warnings collapse to one line a minute with a count.
+- **Operations:**
+  - Shutdown order: backtests are cancelled and their rows marked failed, then feeds and ML engines (prediction flush), then the bar writer's final flush.
+  - A stored model is now served after a restart without retraining; before, every restart retrained. The regression test was checked to fail with the fix reverted.
+  - Postgres via `DATABASE_URL` (asyncpg, D5); `postgres://` URLs are normalised. The migration chain renders as valid PostgreSQL DDL offline.
+  - `render.yaml` generates `ADMIN_TOKEN`, trusts Render's private proxy ranges, and leaves `DATABASE_URL` to set.
+- **Engineering quality (T6):**
+  - Property tests (hypothesis), each checked against a brute-force reference:
+    - order-book sync over snapshot, buffered, stale and duplicate diffs, and a lost diff that must never leave a "synced" book wrong;
+    - trade and sum windows;
+    - bar contiguity, OHLC consistency and volume conservation.
+  - Coverage in CI with a 90 % floor (92.5 % today). It needed `concurrency = greenlet`: SQLAlchemy's async layer runs in greenlets, and the API modules had read 56–61 % instead of 94–95 %.
+  - `test_security.py` covers auth, problems, OpenAPI, rate limits, proxy trust, WebSocket guards, metrics, log dedupe, shutdown and pagination.
+- **End-to-end:**
+  - `scripts/seed_e2e.py` builds a deterministic template once (30 min of fixed-seed synthetic history run through the real engine, plus a model trained on it) in about 30 s, then copies it fresh for every run in about 3 s. Runs no longer inherit each other's rows, and Intelligence tests now assert the seeded model's four isotonic folds.
+  - New Playwright project `webgl-mid`: forces the mid tier so the 3D terrain renders on SwiftShader.
+  - Performance budgets on /strategies, /alerts and /settings:
+    - hard limits: script ≤ 400 KB transferred (measured 325 KB) and CLS ≤ 0.1;
+    - LCP is recorded but only guarded against a hang (15 s): on SwiftShader the same build measured 3.2 s and 7.8 s on consecutive runs.
+  - The budgets surfaced a real bug: CLS on /strategies ranged 0.02–0.15 between loads. The connection banner rendered during the first WebSocket connect (and in the server HTML), then vanished and pulled the page up 37 px. The first connect is no longer announced (a failed attempt still shows it within ~150 ms). CLS is now 0.004–0.026 on every route.
+  - CI uploads coverage and the Playwright report on every run, gives each Docker image its own cache scope, and checks prettier.
+- **Hygiene:**
+  - prettier 3.9.9 (D6) applied once at the code's own 140-column width.
+  - `.gitattributes` (LF), `.pre-commit-config.yaml` (ruff, prettier and eslint from the project's own pinned environments), a `justfile`, and Dependabot (pip, npm, actions, docker; weekly, grouped).
+  - Dead settings removed (`APP_VERSION`, `DEBUG`, `HOST`, the five legacy buffer sizes, `BUY_PRESSURE_WINDOW`, `ALERT_DEFAULT_COOLDOWN_S`).
+  - `ARCHITECTURE.md` (runtime and ten ADRs), `CHANGELOG.md`, and the README's stale Phase 3 wording fixed.
+- **Security fixes found by the gates:** PyJWT 2.14.0 → 2.15.0 (CVE-2026-101918; our decode verifies signatures first, so it was not reachable) and Next.js 16.3.5 → 16.3.8 (critical `next/og` RCE advisory; `next/og` is unused).
+- **Found while verifying the UI:** an error toast raised from a drawer form (e.g. a refused change) rendered underneath the drawer and its backdrop; the command palette would have too. Toasts are now z-80 and the palette z-75, above the drawer at 70/71. An e2e test stubs a 401 and asserts the toast is the topmost element at its own centre; it failed with the old stacking and passes with the fix.
+- **Checks:**
+  - Backend: pytest 134 → 152 with coverage 92.5 % (floor 90 %), ruff, mypy and pip-audit clean. The OpenAPI document is regenerated (38 paths, 89 schemas) with no dangling references.
+  - Frontend: prettier, tsc, eslint and build clean; Vitest 24 → 27.
+  - Playwright 34 → 38 plus the toast test. The final full run was 38/38 in 9.8 min; after the stacking fix the alerts spec ran again (2/2). The Settings baselines were re-recorded for the Access section.
+  - Live: the gated flow ran against a real backend with a temporary `.env` (since removed).
+
+Deviations and limits:
+
+- **Lighthouse is replaced by Playwright budgets** measuring the same things (script bytes, CLS, LCP). The Lighthouse CLI would add a dependency and a CI step that can't run here.
+- **Two dependencies beyond D6's list:** `pytest-cov` (T6's coverage floor) and `asyncpg` (D5's hosted Postgres). Both are pinned.
+- **Not done, because each needs a Docker image pull I have not been cleared for:**
+  - Linux visual baselines (`mcr.microsoft.com/playwright`, ~2 GB); CI still skips the visual spec off Windows.
+  - A migration run against a real Postgres; the DDL was verified offline instead.
+- **Written but not run here:**
+  - The CI workflow (it parses; each step mirrors a gate run locally).
+  - The pre-commit config and the justfile, because `pre-commit` and `just` aren't installed on this machine. The hook commands were exercised by hand.
+- **npm 9 exits 0 on a critical `npm audit` finding at `--audit-level=high`** (observed locally). CI's npm 10 is expected to fail as documented, but it is worth confirming on the first CI run.
+- **Breaking API changes for any outside client:**
+  - History lists return pages.
+  - Errors are problem+json.
+  - Production needs a token for writes.
+  - The CORS wildcard is gone, so a preview frontend needs `CORS_ORIGIN_REGEX`.

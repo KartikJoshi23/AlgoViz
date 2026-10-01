@@ -1,52 +1,50 @@
-# ═══════════════════════════════════════════════════════════════════
-# AlgoViz — Docker Compose (Development)
-# ═══════════════════════════════════════════════════════════════════
-# Run:  docker-compose up --build
-# Stop: docker-compose down
-# Ports: Backend → localhost:8002, Frontend → localhost:3002
-# Note: Smart Contract Scanner uses 8001/3001 — AlgoViz uses 8002/3002
-# ═══════════════════════════════════════════════════════════════════
-
-version: "3.9"
-
+# AlgoViz — local stack.
+#   docker compose up --build                       # live Binance feed
+#   DATA_SOURCE=synthetic docker compose up --build # no internet needed
+#   Backend  → http://localhost:8002   (host 8002 → container 8000)
+#   Frontend → http://localhost:3002   (host 3002 → container 3000)
+#
+# The browser talks to the backend directly, so the frontend image is built
+# with the *host* backend origin (build args below). Change them if you
+# publish the backend on a different host port.
 services:
-  # ── Backend (FastAPI) ──────────────────────────────────────────
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
     container_name: algoviz-backend
     ports:
-      - "8002:8000" # Host 8002 → Container 8000 (avoids conflict with Smart Contract Scanner on 8001)
+      - "8002:8000"
     volumes:
-      - ./backend:/app
       - backend_data:/app/data
       - ml_models:/app/ml_models
     environment:
-      - DEBUG=true
-      - LOG_LEVEL=INFO
-      - DATABASE_URL=sqlite+aiosqlite:///data/algoviz.db
+      ENVIRONMENT: development
+      LOG_LEVEL: INFO
+      DATA_SOURCE: ${DATA_SOURCE:-live}
+      SYMBOLS: '["BTCUSDT"]'
+      # DATABASE_URL defaults to /app/data/algoviz.db for live and to
+      # /app/data/algoviz-<source>.db for synthetic / replay (kept apart on purpose)
+      CORS_ORIGINS: '["http://localhost:3002","http://127.0.0.1:3002","http://localhost:3000","http://127.0.0.1:3000"]'
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD", "curl", "--fail", "http://localhost:8000/health" ]
+      test: ["CMD", "curl", "--fail", "http://localhost:8000/health/live"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 15s
 
-  # ── Frontend (React + Vite) ────────────────────────────────────
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
-    container_name: algoviz-frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8002}
+        NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:8002/ws}
+    container_name: algoviz-web
     ports:
-      - "3002:3002" # Host 3002 → Container 3002 (avoids conflict with Smart Contract Scanner on 3001)
+      - "3002:3000"
     depends_on:
       backend:
         condition: service_healthy
-    environment:
-      - VITE_API_URL=http://backend:8000
     restart: unless-stopped
 
 volumes:

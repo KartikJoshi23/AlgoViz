@@ -1,0 +1,7594 @@
+{
+  "components": {
+    "schemas": {
+      "AccessResponse": {
+        "properties": {
+          "can_write": {
+            "title": "Can Write",
+            "type": "boolean"
+          },
+          "writes_require_auth": {
+            "title": "Writes Require Auth",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "writes_require_auth",
+          "can_write"
+        ],
+        "title": "AccessResponse",
+        "type": "object"
+      },
+      "AcknowledgeResponse": {
+        "properties": {
+          "count": {
+            "default": 1,
+            "title": "Count",
+            "type": "integer"
+          },
+          "status": {
+            "const": "acknowledged",
+            "default": "acknowledged",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "AcknowledgeResponse",
+        "type": "object"
+      },
+      "ActiveSignalPayload": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "activated_at_ms": {
+            "title": "Activated At Ms",
+            "type": "integer"
+          },
+          "impact": {
+            "title": "Impact",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "priority": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Priority",
+            "type": "string"
+          },
+          "rule_id": {
+            "title": "Rule Id",
+            "type": "string"
+          },
+          "seconds_active": {
+            "title": "Seconds Active",
+            "type": "number"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "values": {
+            "additionalProperties": true,
+            "title": "Values",
+            "type": "object"
+          }
+        },
+        "required": [
+          "rule_id",
+          "name",
+          "priority",
+          "message",
+          "action",
+          "impact",
+          "tags",
+          "activated_at_ms",
+          "seconds_active",
+          "values"
+        ],
+        "title": "ActiveSignalPayload",
+        "type": "object"
+      },
+      "AlertEngineStats": {
+        "properties": {
+          "discord": {
+            "$ref": "#/components/schemas/DiscordStats"
+          },
+          "evaluations": {
+            "title": "Evaluations",
+            "type": "integer"
+          },
+          "fired": {
+            "title": "Fired",
+            "type": "integer"
+          },
+          "rules_cached": {
+            "title": "Rules Cached",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rules_cached",
+          "evaluations",
+          "fired",
+          "discord"
+        ],
+        "title": "AlertEngineStats",
+        "type": "object"
+      },
+      "AlertHistoryPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AlertHistoryResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_before": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Before"
+          }
+        },
+        "required": [
+          "items",
+          "next_before"
+        ],
+        "title": "AlertHistoryPage",
+        "type": "object"
+      },
+      "AlertHistoryResponse": {
+        "properties": {
+          "acknowledged": {
+            "title": "Acknowledged",
+            "type": "boolean"
+          },
+          "acknowledged_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged At"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "priority": {
+            "title": "Priority",
+            "type": "string"
+          },
+          "rule_id": {
+            "title": "Rule Id",
+            "type": "integer"
+          },
+          "rule_name": {
+            "title": "Rule Name",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "triggered_at": {
+            "format": "date-time",
+            "title": "Triggered At",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "id",
+          "rule_id",
+          "rule_name",
+          "symbol",
+          "priority",
+          "message",
+          "field",
+          "value",
+          "threshold",
+          "acknowledged",
+          "acknowledged_at",
+          "triggered_at"
+        ],
+        "title": "AlertHistoryResponse",
+        "type": "object"
+      },
+      "AlertMessage": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AlertPayload"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "integer"
+          },
+          "type": {
+            "const": "alert",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "type",
+          "data"
+        ],
+        "title": "AlertMessage",
+        "type": "object"
+      },
+      "AlertPayload": {
+        "properties": {
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "priority": {
+            "title": "Priority",
+            "type": "string"
+          },
+          "rule_id": {
+            "title": "Rule Id",
+            "type": "integer"
+          },
+          "rule_name": {
+            "title": "Rule Name",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "triggered_at": {
+            "title": "Triggered At",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "id",
+          "rule_id",
+          "rule_name",
+          "symbol",
+          "priority",
+          "message",
+          "field",
+          "value",
+          "threshold",
+          "triggered_at"
+        ],
+        "title": "AlertPayload",
+        "type": "object"
+      },
+      "AlertRuleCreate": {
+        "properties": {
+          "alert_type": {
+            "default": "threshold",
+            "title": "Alert Type",
+            "type": "string"
+          },
+          "comparison": {
+            "enum": [
+              "gt",
+              "gte",
+              "lt",
+              "lte",
+              "eq",
+              "in"
+            ],
+            "title": "Comparison",
+            "type": "string"
+          },
+          "condition_field": {
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Condition Field",
+            "type": "string"
+          },
+          "cooldown_seconds": {
+            "default": 30,
+            "maximum": 86400.0,
+            "minimum": 0.0,
+            "title": "Cooldown Seconds",
+            "type": "integer"
+          },
+          "message_template": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Template"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "notify_discord": {
+            "default": false,
+            "title": "Notify Discord",
+            "type": "boolean"
+          },
+          "notify_email": {
+            "default": false,
+            "title": "Notify Email",
+            "type": "boolean"
+          },
+          "priority": {
+            "default": "medium",
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low",
+              "info"
+            ],
+            "title": "Priority",
+            "type": "string"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "condition_field",
+          "comparison",
+          "threshold"
+        ],
+        "title": "AlertRuleCreate",
+        "type": "object"
+      },
+      "AlertRuleResponse": {
+        "properties": {
+          "alert_type": {
+            "title": "Alert Type",
+            "type": "string"
+          },
+          "comparison": {
+            "title": "Comparison",
+            "type": "string"
+          },
+          "condition_field": {
+            "title": "Condition Field",
+            "type": "string"
+          },
+          "cooldown_seconds": {
+            "title": "Cooldown Seconds",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_enabled": {
+            "title": "Is Enabled",
+            "type": "boolean"
+          },
+          "last_fired_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Fired At"
+          },
+          "message_template": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Template"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "notify_discord": {
+            "title": "Notify Discord",
+            "type": "boolean"
+          },
+          "notify_email": {
+            "title": "Notify Email",
+            "type": "boolean"
+          },
+          "priority": {
+            "title": "Priority",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "number"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "symbol",
+          "alert_type",
+          "condition_field",
+          "comparison",
+          "threshold",
+          "priority",
+          "message_template",
+          "cooldown_seconds",
+          "is_enabled",
+          "notify_discord",
+          "notify_email",
+          "last_fired_at",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AlertRuleResponse",
+        "type": "object"
+      },
+      "AlertRuleUpdate": {
+        "properties": {
+          "comparison": {
+            "anyOf": [
+              {
+                "enum": [
+                  "gt",
+                  "gte",
+                  "lt",
+                  "lte",
+                  "eq",
+                  "in"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparison"
+          },
+          "condition_field": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Condition Field"
+          },
+          "cooldown_seconds": {
+            "anyOf": [
+              {
+                "maximum": 86400.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooldown Seconds"
+          },
+          "is_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Enabled"
+          },
+          "message_template": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Template"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "notify_discord": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notify Discord"
+          },
+          "notify_email": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notify Email"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "enum": [
+                  "critical",
+                  "high",
+                  "medium",
+                  "low",
+                  "info"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          }
+        },
+        "title": "AlertRuleUpdate",
+        "type": "object"
+      },
+      "BacktestDetailResponse": {
+        "properties": {
+          "commission_bps": {
+            "title": "Commission Bps",
+            "type": "number"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "data_source": {
+            "title": "Data Source",
+            "type": "string"
+          },
+          "end_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time"
+          },
+          "equity_curve": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Equity Curve",
+            "type": "array"
+          },
+          "exposure_pct": {
+            "title": "Exposure Pct",
+            "type": "number"
+          },
+          "final_capital": {
+            "title": "Final Capital",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "initial_capital": {
+            "title": "Initial Capital",
+            "type": "number"
+          },
+          "max_drawdown_pct": {
+            "title": "Max Drawdown Pct",
+            "type": "number"
+          },
+          "profit_factor": {
+            "title": "Profit Factor",
+            "type": "number"
+          },
+          "sharpe_ratio": {
+            "title": "Sharpe Ratio",
+            "type": "number"
+          },
+          "slippage_bps": {
+            "title": "Slippage Bps",
+            "type": "number"
+          },
+          "sortino_ratio": {
+            "title": "Sortino Ratio",
+            "type": "number"
+          },
+          "start_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Time"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "strategy_id": {
+            "title": "Strategy Id",
+            "type": "integer"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "total_pnl": {
+            "title": "Total Pnl",
+            "type": "number"
+          },
+          "total_pnl_pct": {
+            "title": "Total Pnl Pct",
+            "type": "number"
+          },
+          "total_trades": {
+            "title": "Total Trades",
+            "type": "integer"
+          },
+          "trades": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestTrade"
+            },
+            "title": "Trades",
+            "type": "array"
+          },
+          "win_rate": {
+            "title": "Win Rate",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "strategy_id",
+          "symbol",
+          "data_source",
+          "status",
+          "initial_capital",
+          "final_capital",
+          "total_pnl",
+          "total_pnl_pct",
+          "total_trades",
+          "win_rate",
+          "max_drawdown_pct",
+          "sharpe_ratio",
+          "sortino_ratio",
+          "profit_factor",
+          "exposure_pct",
+          "commission_bps",
+          "slippage_bps",
+          "start_time",
+          "end_time",
+          "created_at"
+        ],
+        "title": "BacktestDetailResponse",
+        "type": "object"
+      },
+      "BacktestPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_before": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Before"
+          }
+        },
+        "required": [
+          "items",
+          "next_before"
+        ],
+        "title": "BacktestPage",
+        "type": "object"
+      },
+      "BacktestProgressMessage": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/BacktestProgressPayload"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "integer"
+          },
+          "type": {
+            "const": "backtest_progress",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "type",
+          "data"
+        ],
+        "title": "BacktestProgressMessage",
+        "type": "object"
+      },
+      "BacktestProgressPayload": {
+        "properties": {
+          "backtest_id": {
+            "title": "Backtest Id",
+            "type": "integer"
+          },
+          "data_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Source"
+          },
+          "done": {
+            "title": "Done",
+            "type": "integer"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metrics"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "loading",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "backtest_id",
+          "status",
+          "done",
+          "total"
+        ],
+        "title": "BacktestProgressPayload",
+        "type": "object"
+      },
+      "BacktestRequest": {
+        "description": "`strategy_id` comes from the path \u2014 it is not part of the body.",
+        "properties": {
+          "commission_bps": {
+            "default": 1.0,
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Commission Bps",
+            "type": "number"
+          },
+          "initial_capital": {
+            "default": 10000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Initial Capital",
+            "type": "number"
+          },
+          "lookback_minutes": {
+            "default": 240,
+            "maximum": 1440.0,
+            "minimum": 5.0,
+            "title": "Lookback Minutes",
+            "type": "integer"
+          },
+          "slippage_bps": {
+            "default": 0.5,
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Slippage Bps",
+            "type": "number"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          }
+        },
+        "title": "BacktestRequest",
+        "type": "object"
+      },
+      "BacktestResponse": {
+        "properties": {
+          "commission_bps": {
+            "title": "Commission Bps",
+            "type": "number"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "data_source": {
+            "title": "Data Source",
+            "type": "string"
+          },
+          "end_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time"
+          },
+          "exposure_pct": {
+            "title": "Exposure Pct",
+            "type": "number"
+          },
+          "final_capital": {
+            "title": "Final Capital",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "initial_capital": {
+            "title": "Initial Capital",
+            "type": "number"
+          },
+          "max_drawdown_pct": {
+            "title": "Max Drawdown Pct",
+            "type": "number"
+          },
+          "profit_factor": {
+            "title": "Profit Factor",
+            "type": "number"
+          },
+          "sharpe_ratio": {
+            "title": "Sharpe Ratio",
+            "type": "number"
+          },
+          "slippage_bps": {
+            "title": "Slippage Bps",
+            "type": "number"
+          },
+          "sortino_ratio": {
+            "title": "Sortino Ratio",
+            "type": "number"
+          },
+          "start_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Time"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "strategy_id": {
+            "title": "Strategy Id",
+            "type": "integer"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "total_pnl": {
+            "title": "Total Pnl",
+            "type": "number"
+          },
+          "total_pnl_pct": {
+            "title": "Total Pnl Pct",
+            "type": "number"
+          },
+          "total_trades": {
+            "title": "Total Trades",
+            "type": "integer"
+          },
+          "win_rate": {
+            "title": "Win Rate",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "strategy_id",
+          "symbol",
+          "data_source",
+          "status",
+          "initial_capital",
+          "final_capital",
+          "total_pnl",
+          "total_pnl_pct",
+          "total_trades",
+          "win_rate",
+          "max_drawdown_pct",
+          "sharpe_ratio",
+          "sortino_ratio",
+          "profit_factor",
+          "exposure_pct",
+          "commission_bps",
+          "slippage_bps",
+          "start_time",
+          "end_time",
+          "created_at"
+        ],
+        "title": "BacktestResponse",
+        "type": "object"
+      },
+      "BacktestTrade": {
+        "properties": {
+          "costs": {
+            "title": "Costs",
+            "type": "number"
+          },
+          "entry_price": {
+            "title": "Entry Price",
+            "type": "number"
+          },
+          "entry_ts": {
+            "title": "Entry Ts",
+            "type": "integer"
+          },
+          "exit_price": {
+            "title": "Exit Price",
+            "type": "number"
+          },
+          "exit_ts": {
+            "title": "Exit Ts",
+            "type": "integer"
+          },
+          "hold_s": {
+            "title": "Hold S",
+            "type": "number"
+          },
+          "pnl": {
+            "title": "Pnl",
+            "type": "number"
+          },
+          "pnl_bps": {
+            "title": "Pnl Bps",
+            "type": "number"
+          },
+          "qty": {
+            "title": "Qty",
+            "type": "number"
+          },
+          "reason": {
+            "enum": [
+              "stop_loss",
+              "take_profit",
+              "max_hold",
+              "exit_rule",
+              "end_of_data"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "side": {
+            "enum": [
+              "long",
+              "short"
+            ],
+            "title": "Side",
+            "type": "string"
+          }
+        },
+        "required": [
+          "side",
+          "entry_ts",
+          "exit_ts",
+          "entry_price",
+          "exit_price",
+          "qty",
+          "pnl",
+          "pnl_bps",
+          "costs",
+          "hold_s",
+          "reason"
+        ],
+        "title": "BacktestTrade",
+        "type": "object"
+      },
+      "BarMessage": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/BarRows"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "integer"
+          },
+          "type": {
+            "const": "bar",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "type",
+          "data"
+        ],
+        "title": "BarMessage",
+        "type": "object"
+      },
+      "BarRows": {
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "rows": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "columns",
+          "rows"
+        ],
+        "title": "BarRows",
+        "type": "object"
+      },
+      "BookMessage": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/BookPayload"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "integer"
+          },
+          "type": {
+            "const": "book",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "type",
+          "data"
+        ],
+        "title": "BookMessage",
+        "type": "object"
+      },
+      "BookPayload": {
+        "properties": {
+          "asks": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "title": "Asks",
+            "type": "array"
+          },
+          "bids": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "title": "Bids",
+            "type": "array"
+          },
+          "imbalance_l1": {
+            "title": "Imbalance L1",
+            "type": "number"
+          },
+          "imbalance_w": {
+            "title": "Imbalance W",
+            "type": "number"
+          },
+          "levels": {
+            "title": "Levels",
+            "type": "integer"
+          },
+          "liquidity_10bps": {
+            "title": "Liquidity 10Bps",
+            "type": "number"
+          },
+          "microprice": {
+            "title": "Microprice",
+            "type": "number"
+          },
+          "mid": {
+            "title": "Mid",
+            "type": "number"
+          },
+          "ofi_1s": {
+            "title": "Ofi 1S",
+            "type": "number"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DepthProfile"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "spread_bps": {
+            "title": "Spread Bps",
+            "type": "number"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "ts_ms": {
+            "title": "Ts Ms",
+            "type": "integer"
+          },
+          "update_id": {
+            "title": "Update Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "symbol",
+          "ts_ms",
+          "bids",
+          "asks",
+          "mid",
+          "microprice",
+          "spread_bps",
+          "imbalance_l1",
+          "imbalance_w",
+          "ofi_1s",
+          "liquidity_10bps",
+          "levels",
+          "update_id"
+        ],
+        "title": "BookPayload",
+        "type": "object"
+      },
+      "BookStats": {
+        "properties": {
+          "levels": {
+            "title": "Levels",
+            "type": "integer"
+          },
+          "metric_scans": {
+            "title": "Metric Scans",
+            "type": "integer"
+          },
+          "pruned_levels": {
+            "title": "Pruned Levels",
+            "type": "integer"
+          },
+          "resyncs": {
+            "title": "Resyncs",
+            "type": "integer"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "update_id": {
+            "title": "Update Id",
+            "type": "integer"
+          },
+          "updates_applied": {
+            "title": "Updates Applied",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "state",
+          "levels",
+          "update_id",
+          "resyncs",
+          "updates_applied",
+          "metric_scans",
+          "pruned_levels"
+        ],
+        "title": "BookStats",
+        "type": "object"
+      },
+      "DepthProfile": {
+        "description": "Cumulative depth per bin from mid outward (see `LocalOrderBook.depth_profile`).",
+        "properties": {
+          "asks": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Asks",
+            "type": "array"
+          },
+          "band_bps": {
+            "title": "Band Bps",
+            "type": "number"
+          },
+          "bids": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Bids",
+            "type": "array"
+          },
+          "bins": {
+            "title": "Bins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "band_bps",
+          "bins",
+          "bids",
+          "asks"
+        ],
+        "title": "DepthProfile",
+        "type": "object"
+      },
+      "DiscordStats": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "sent": {
+            "title": "Sent",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "enabled",
+          "sent",
+          "failed"
+        ],
+        "title": "DiscordStats",
+        "type": "object"
+      },
+      "DriftOutcome": {
+        "properties": {
+          "hit": {
+            "title": "Hit",
+            "type": "boolean"
+          },
+          "log_loss": {
+            "title": "Log Loss",
+            "type": "number"
+          },
+          "p_down": {
+            "title": "P Down",
+            "type": "number"
+          },
+          "p_up": {
+            "title": "P Up",
+            "type": "number"
+          },
+          "predicted": {
+            "title": "Predicted",
+            "type": "integer"
+          },
+          "realised": {
+            "title": "Realised",
+            "type": "integer"
+          },
+          "realised_bps": {
+            "title": "Realised Bps",
+            "type": "number"
+          },
+          "ts_ms": {
+            "title": "Ts Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ts_ms",
+          "p_up",
+          "p_down",
+          "predicted",
+          "realised",
+          "hit",
+          "log_loss",
+          "realised_bps"
+        ],
+        "title": "DriftOutcome",
+        "type": "object"
+      },
+      "DriftResponse": {
+        "properties": {
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/DriftOutcome"
+            },
+            "title": "Series",
+            "type": "array"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/DriftSummary"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "summary",
+          "series"
+        ],
+        "title": "DriftResponse",
+        "type": "object"
+      },
+      "DriftSummary": {
+        "properties": {
+          "brier": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brier"
+          },
+          "directional_hit_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Directional Hit Rate"
+          },
+          "edge_vs_prior": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edge Vs Prior"
+          },
+          "hit_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hit Rate"
+          },
+          "log_loss": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Log Loss"
+          },
+          "mean_abs_move_bps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Abs Move Bps"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "n_required": {
+            "title": "N Required",
+            "type": "integer"
+          },
+          "prior_log_loss": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prior Log Loss"
+          },
+          "realised_class_mix": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realised Class Mix"
+          },
+          "status": {
+            "enum": [
+              "no_data",
+              "edge",
+              "no_edge",
+              "decayed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "total_resolved": {
+            "title": "Total Resolved",
+            "type": "integer"
+          },
+          "train_log_loss": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Train Log Loss"
+          },
+          "train_prior_log_loss": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Train Prior Log Loss"
+          }
+        },
+        "required": [
+          "status",
+          "n",
+          "n_required",
+          "total_resolved"
+        ],
+        "title": "DriftSummary",
+        "type": "object"
+      },
+      "ErrorMessage": {
+        "properties": {
+          "data": {
+            "additionalProperties": true,
+            "title": "Data",
+            "type": "object"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "integer"
+          },
+          "type": {
+            "const": "error",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "type",
+          "data"
+        ],
+        "title": "ErrorMessage",
+        "type": "object"
+      },
+      "FeatureCatalogEntry": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "price",
+              "bps",
+              "ratio",
+              "rate",
+              "quantity",
+              "zscore",
+              "categorical",
+              "probability"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ops": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ops",
+            "type": "array"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "label",
+          "unit",
+          "kind",
+          "group",
+          "description",
+          "ops",
+          "values"
+        ],
+        "title": "FeatureCatalogEntry",
+        "type": "object"
+      },
+      "FeaturesMessage": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/FeaturesPayload"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "integer"
+          },
+          "type": {
+            "const": "features",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "type",
+          "data"
+        ],
+        "title": "FeaturesMessage",
+        "type": "object"
+      },
+      "FeaturesPayload": {
+        "properties": {
+          "ask_qty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ask Qty"
+          },
+          "best_ask": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Ask"
+          },
+          "best_bid": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Bid"
+          },
+          "bid_qty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bid Qty"
+          },
+          "book_slope_ask": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Book Slope Ask"
+          },
+          "book_slope_bid": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Book Slope Bid"
+          },
+          "buy_pressure": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buy Pressure"
+          },
+          "imbalance_l1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Imbalance L1"
+          },
+          "imbalance_w": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Imbalance W"
+          },
+          "imbalance_z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Imbalance Z"
+          },
+          "last_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Price"
+          },
+          "liquidity_10bps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Liquidity 10Bps"
+          },
+          "liquidity_25bps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Liquidity 25Bps"
+          },
+          "liquidity_5bps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Liquidity 5Bps"
+          },
+          "liquidity_z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Liquidity Z"
+          },
+          "microprice": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Microprice"
+          },
+          "microprice_dev_bps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Microprice Dev Bps"
+          },
+          "mid": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mid"
+          },
+          "ofi_1s": {
+            "title": "Ofi 1S",
+            "type": "number"
+          },
+          "ofi_30s": {
+            "title": "Ofi 30S",
+            "type": "number"
+          },
+          "ofi_5s": {
+            "title": "Ofi 5S",
+            "type": "number"
+          },
+          "ofi_z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ofi Z"
+          },
+          "p_down": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P Down"
+          },
+          "p_up": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P Up"
+          },
+          "price_vs_vwap_bps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Vs Vwap Bps"
+          },
+          "regime": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regime"
+          },
+          "regime_direction": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regime Direction"
+          },
+          "regime_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regime Source"
+          },
+          "session_change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Change Pct"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "spread_bps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spread Bps"
+          },
+          "spread_z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spread Z"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "trade_count_30s": {
+            "title": "Trade Count 30S",
+            "type": "integer"
+          },
+          "trend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trend"
+          },
+          "ts_ms": {
+            "title": "Ts Ms",
+            "type": "integer"
+          },
+          "twap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Twap"
+          },
+          "velocity": {
+            "title": "Velocity",
+            "type": "number"
+          },
+          "velocity_baseline": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Velocity Baseline"
+          },
+          "velocity_z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Velocity Z"
+          },
+          "vol_z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vol Z"
+          },
+          "volatility_bps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility Bps"
+          },
+          "volume_30s": {
+            "title": "Volume 30S",
+            "type": "number"
+          },
+          "vwap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vwap"
+          },
+          "warmed_up": {
+            "title": "Warmed Up",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "symbol",
+          "ts_ms",
+          "source",
+          "warmed_up",
+          "last_price",
+          "mid",
+          "microprice",
+          "microprice_dev_bps",
+          "vwap",
+          "twap",
+          "price_vs_vwap_bps",
+          "session_change_pct",
+          "best_bid",
+          "best_ask",
+          "bid_qty",
+          "ask_qty",
+          "spread_bps",
+          "imbalance_l1",
+          "imbalance_w",
+          "liquidity_5bps",
+          "liquidity_10bps",
+          "liquidity_25bps",
+          "book_slope_bid",
+          "book_slope_ask",
+          "ofi_1s",
+          "ofi_5s",
+          "ofi_30s",
+          "velocity",
+          "velocity_baseline",
+          "buy_pressure",
+          "volume_30s",
+          "trade_count_30s",
+          "volatility_bps",
+          "spread_z",
+          "velocity_z",
+          "vol_z",
+          "ofi_z",
+          "imbalance_z",
+          "liquidity_z",
+          "regime",
+          "regime_direction",
+          "regime_source",
+          "trend"
+        ],
+        "title": "FeaturesPayload",
+        "type": "object"
+      },
+      "FieldError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Loc",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Msg",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "FieldError",
+        "type": "object"
+      },
+      "FoldMetricsResponse": {
+        "properties": {
+          "accuracy": {
+            "title": "Accuracy",
+            "type": "number"
+          },
+          "brier": {
+            "title": "Brier",
+            "type": "number"
+          },
+          "brier_reliability": {
+            "title": "Brier Reliability",
+            "type": "number"
+          },
+          "brier_resolution": {
+            "title": "Brier Resolution",
+            "type": "number"
+          },
+          "brier_uncertainty": {
+            "title": "Brier Uncertainty",
+            "type": "number"
+          },
+          "calibration": {
+            "enum": [
+              "isotonic",
+              "sigmoid",
+              "none"
+            ],
+            "title": "Calibration",
+            "type": "string"
+          },
+          "log_loss": {
+            "title": "Log Loss",
+            "type": "number"
+          },
+          "logistic_accuracy": {
+            "title": "Logistic Accuracy",
+            "type": "number"
+          },
+          "logistic_log_loss": {
+            "title": "Logistic Log Loss",
+            "type": "number"
+          },
+          "n_test": {
+            "title": "N Test",
+            "type": "integer"
+          },
+          "n_train": {
+            "title": "N Train",
+            "type": "integer"
+          },
+          "prior_log_loss": {
+            "title": "Prior Log Loss",
+            "type": "number"
+          },
+          "raw_log_loss": {
+            "title": "Raw Log Loss",
+            "type": "number"
+          },
+          "reliability": {
+            "$ref": "#/components/schemas/ReliabilityCurve"
+          }
+        },
+        "required": [
+          "n_train",
+          "n_test",
+          "accuracy",
+          "log_loss",
+          "raw_log_loss",
+          "brier",
+          "brier_reliability",
+          "brier_resolution",
+          "brier_uncertainty",
+          "prior_log_loss",
+          "logistic_log_loss",
+          "logistic_accuracy",
+          "calibration",
+          "reliability"
+        ],
+        "title": "FoldMetricsResponse",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "description": "Summary health; always 200 \u2014 see `/health/live` and `/health/ready` for probes.",
+        "properties": {
+          "data_source": {
+            "title": "Data Source",
+            "type": "string"
+          },
+          "environment": {
+            "title": "Environment",
+            "type": "string"
+          },
+          "loop_lag_p99_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loop Lag P99 Ms"
+          },
+          "market_connected": {
+            "title": "Market Connected",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "degraded"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols",
+            "type": "array"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "uptime_seconds": {
+            "title": "Uptime Seconds",
+            "type": "number"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
+          "ws_clients": {
+            "title": "Ws Clients",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "version",
+          "environment",
+          "uptime_seconds",
+          "data_source",
+          "symbols",
+          "market_connected",
+          "ws_clients",
+          "timestamp"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "HelloMessage": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/HelloPayload"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "integer"
+          },
+          "type": {
+            "const": "hello",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "type",
+          "data"
+        ],
+        "title": "HelloMessage",
+        "type": "object"
+      },
+      "HelloPayload": {
+        "properties": {
+          "bar_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Bar Columns",
+            "type": "array"
+          },
+          "channels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Channels",
+            "type": "array"
+          },
+          "default_symbol": {
+            "title": "Default Symbol",
+            "type": "string"
+          },
+          "server_time_ms": {
+            "title": "Server Time Ms",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "subscribed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Subscribed",
+            "type": "array"
+          },
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols",
+            "type": "array"
+          },
+          "time_scale": {
+            "title": "Time Scale",
+            "type": "number"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "symbols",
+          "default_symbol",
+          "source",
+          "time_scale",
+          "channels",
+          "subscribed",
+          "bar_columns",
+          "server_time_ms"
+        ],
+        "title": "HelloPayload",
+        "type": "object"
+      },
+      "LivenessResponse": {
+        "description": "The process is up and its event loop answers (use for restart decisions).",
+        "properties": {
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "LivenessResponse",
+        "type": "object"
+      },
+      "LoginRequest": {
+        "properties": {
+          "password": {
+            "maxLength": 72,
+            "title": "Password",
+            "type": "string"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "LoginRequest",
+        "type": "object"
+      },
+      "LoopLagStats": {
+        "properties": {
+          "current_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Ms"
+          },
+          "max_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Ms"
+          },
+          "p50_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P50 Ms"
+          },
+          "p99_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P99 Ms"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          },
+          "window_s": {
+            "title": "Window S",
+            "type": "number"
+          }
+        },
+        "required": [
+          "samples",
+          "window_s"
+        ],
+        "title": "LoopLagStats",
+        "type": "object"
+      },
+      "MLRuntimeStats": {
+        "properties": {
+          "inference_timeouts": {
+            "title": "Inference Timeouts",
+            "type": "integer"
+          },
+          "last_inference_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Inference Ms"
+          },
+          "last_training_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Training S"
+          },
+          "prediction_backlog": {
+            "title": "Prediction Backlog",
+            "type": "integer"
+          },
+          "prediction_failed_flushes": {
+            "title": "Prediction Failed Flushes",
+            "type": "integer"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          },
+          "sessions": {
+            "title": "Sessions",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "warming_up",
+              "training",
+              "ready"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "training": {
+            "title": "Training",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "version",
+          "samples",
+          "training",
+          "last_training_s",
+          "last_inference_ms",
+          "inference_timeouts",
+          "sessions",
+          "prediction_backlog",
+          "prediction_failed_flushes"
+        ],
+        "title": "MLRuntimeStats",
+        "type": "object"
+      },
+      "MarketStats": {
+        "properties": {
+          "alerts": {
+            "$ref": "#/components/schemas/AlertEngineStats"
+          },
+          "backtests_running": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Backtests Running",
+            "type": "array"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "symbols": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SymbolStats"
+            },
+            "title": "Symbols",
+            "type": "object"
+          },
+          "writer": {
+            "$ref": "#/components/schemas/WriterStats"
+          },
+          "ws": {
+            "$ref": "#/components/schemas/WSStats"
+          }
+        },
+        "required": [
+          "source",
+          "symbols",
+          "writer",
+          "alerts",
+          "backtests_running",
+          "ws"
+        ],
+        "title": "MarketStats",
+        "type": "object"
+      },
+      "MarketStatsResponse": {
+        "properties": {
+          "alerts": {
+            "$ref": "#/components/schemas/AlertEngineStats"
+          },
+          "backtests_running": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Backtests Running",
+            "type": "array"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "symbols": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SymbolStats"
+            },
+            "title": "Symbols",
+            "type": "object"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "writer": {
+            "$ref": "#/components/schemas/WriterStats"
+          },
+          "ws": {
+            "$ref": "#/components/schemas/WSStats"
+          }
+        },
+        "required": [
+          "source",
+          "symbols",
+          "writer",
+          "alerts",
+          "backtests_running",
+          "ws",
+          "timestamp"
+        ],
+        "title": "MarketStatsResponse",
+        "type": "object"
+      },
+      "ModelInfoResponse": {
+        "properties": {
+          "barrier_k": {
+            "title": "Barrier K",
+            "type": "number"
+          },
+          "calibration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibration"
+          },
+          "class_prior": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Class Prior",
+            "type": "object"
+          },
+          "drift": {
+            "$ref": "#/components/schemas/DriftSummary"
+          },
+          "feature_importance": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Feature Importance",
+            "type": "object"
+          },
+          "feature_importance_std": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Feature Importance Std",
+            "type": "object"
+          },
+          "feature_names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Feature Names",
+            "type": "array"
+          },
+          "horizon_s": {
+            "title": "Horizon S",
+            "type": "integer"
+          },
+          "hyperparameters": {
+            "additionalProperties": true,
+            "title": "Hyperparameters",
+            "type": "object"
+          },
+          "lookback_bars": {
+            "title": "Lookback Bars",
+            "type": "integer"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/ModelMetrics"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "model_version": {
+            "title": "Model Version",
+            "type": "integer"
+          },
+          "next_retrain_in_samples": {
+            "title": "Next Retrain In Samples",
+            "type": "integer"
+          },
+          "pending_labels": {
+            "title": "Pending Labels",
+            "type": "integer"
+          },
+          "predictions_persisted": {
+            "title": "Predictions Persisted",
+            "type": "integer"
+          },
+          "predictions_resolved": {
+            "title": "Predictions Resolved",
+            "type": "integer"
+          },
+          "samples_available": {
+            "title": "Samples Available",
+            "type": "integer"
+          },
+          "samples_required": {
+            "title": "Samples Required",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "warming_up",
+              "training",
+              "ready"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "trained_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trained At"
+          },
+          "training_runs": {
+            "title": "Training Runs",
+            "type": "integer"
+          },
+          "training_samples": {
+            "title": "Training Samples",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "symbol",
+          "status",
+          "model_version",
+          "model_id",
+          "trained_at",
+          "training_samples",
+          "samples_available",
+          "samples_required",
+          "pending_labels",
+          "horizon_s",
+          "lookback_bars",
+          "barrier_k",
+          "calibration",
+          "metrics",
+          "class_prior",
+          "feature_importance",
+          "feature_importance_std",
+          "feature_names",
+          "hyperparameters",
+          "next_retrain_in_samples",
+          "training_runs",
+          "drift",
+          "predictions_persisted",
+          "predictions_resolved"
+        ],
+        "title": "ModelInfoResponse",
+        "type": "object"
+      },
+      "ModelMetrics": {
+        "properties": {
+          "folds": {
+            "items": {
+              "$ref": "#/components/schemas/FoldMetricsResponse"
+            },
+            "title": "Folds",
+            "type": "array"
+          },
+          "oos": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Oos",
+            "type": "object"
+          },
+          "reliability": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReliabilityCurve"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "oos",
+          "folds"
+        ],
+        "title": "ModelMetrics",
+        "type": "object"
+      },
+      "ModelRegistryEntry": {
+        "properties": {
+          "feature_importance": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feature Importance"
+          },
+          "horizon_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizon S"
+          },
+          "hyperparameters": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hyperparameters"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metrics"
+          },
+          "model_type": {
+            "title": "Model Type",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "trained_at": {
+            "title": "Trained At",
+            "type": "string"
+          },
+          "training_samples": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Training Samples"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "symbol",
+          "name",
+          "model_type",
+          "version",
+          "training_samples",
+          "horizon_s",
+          "metrics",
+          "feature_importance",
+          "hyperparameters",
+          "is_active",
+          "trained_at"
+        ],
+        "title": "ModelRegistryEntry",
+        "type": "object"
+      },
+      "ModelRegistryPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ModelRegistryEntry"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_before": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Before"
+          }
+        },
+        "required": [
+          "items",
+          "next_before"
+        ],
+        "title": "ModelRegistryPage",
+        "type": "object"
+      },
+      "PingMessage": {
+        "properties": {
+          "op": {
+            "const": "ping",
+            "title": "Op",
+            "type": "string"
+          },
+          "ts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ts"
+          }
+        },
+        "required": [
+          "op"
+        ],
+        "title": "PingMessage",
+        "type": "object"
+      },
+      "PongMessage": {
+        "properties": {
+          "data": {
+            "additionalProperties": true,
+            "title": "Data",
+            "type": "object"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "integer"
+          },
+          "type": {
+            "const": "pong",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "type"
+        ],
+        "title": "PongMessage",
+        "type": "object"
+      },
+      "PredictionMessage": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PredictionPayload"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "integer"
+          },
+          "type": {
+            "const": "prediction",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "type",
+          "data"
+        ],
+        "title": "PredictionMessage",
+        "type": "object"
+      },
+      "PredictionPayload": {
+        "properties": {
+          "barrier_bps": {
+            "title": "Barrier Bps",
+            "type": "number"
+          },
+          "calibration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibration"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "drift": {
+            "$ref": "#/components/schemas/DriftSummary"
+          },
+          "horizon_s": {
+            "title": "Horizon S",
+            "type": "integer"
+          },
+          "model_version": {
+            "title": "Model Version",
+            "type": "integer"
+          },
+          "p_down": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P Down"
+          },
+          "p_flat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P Flat"
+          },
+          "p_up": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P Up"
+          },
+          "pending_labels": {
+            "title": "Pending Labels",
+            "type": "integer"
+          },
+          "predicted_class": {
+            "anyOf": [
+              {
+                "enum": [
+                  "up",
+                  "down",
+                  "flat"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Predicted Class"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          },
+          "samples_required": {
+            "title": "Samples Required",
+            "type": "integer"
+          },
+          "signal": {
+            "enum": [
+              "long",
+              "short",
+              "flat"
+            ],
+            "title": "Signal",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "warming_up",
+              "ready",
+              "error"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "training": {
+            "title": "Training",
+            "type": "boolean"
+          },
+          "ts_ms": {
+            "title": "Ts Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "symbol",
+          "ts_ms",
+          "status",
+          "horizon_s",
+          "barrier_bps",
+          "p_up",
+          "p_down",
+          "p_flat",
+          "predicted_class",
+          "confidence",
+          "signal",
+          "model_version",
+          "calibration",
+          "samples",
+          "samples_required",
+          "pending_labels",
+          "training",
+          "drift",
+          "timestamp"
+        ],
+        "title": "PredictionPayload",
+        "type": "object"
+      },
+      "Problem": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Detail"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FieldError"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Errors"
+          },
+          "instance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Instance"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Request Id"
+          },
+          "status": {
+            "title": "Status",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "default": "about:blank",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "status"
+        ],
+        "title": "Problem",
+        "type": "object"
+      },
+      "ReadinessResponse": {
+        "description": "Ready to serve live data (use for traffic decisions); 503 when any check fails.",
+        "properties": {
+          "checks": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Checks",
+            "type": "object"
+          },
+          "detail": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Detail",
+            "type": "object"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ready",
+          "checks",
+          "detail"
+        ],
+        "title": "ReadinessResponse",
+        "type": "object"
+      },
+      "RegimeMessage": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RegimePayload"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "integer"
+          },
+          "type": {
+            "const": "regime",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "type",
+          "data"
+        ],
+        "title": "RegimeMessage",
+        "type": "object"
+      },
+      "RegimePayload": {
+        "description": "The volatility state (HMM) and, separately, the trend (drift t-statistic).",
+        "properties": {
+          "bars_seen": {
+            "title": "Bars Seen",
+            "type": "integer"
+          },
+          "direction": {
+            "title": "Direction",
+            "type": "number"
+          },
+          "label": {
+            "enum": [
+              "calm",
+              "normal",
+              "elevated",
+              "extreme"
+            ],
+            "title": "Label",
+            "type": "string"
+          },
+          "model_version": {
+            "title": "Model Version",
+            "type": "integer"
+          },
+          "probs": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Probs",
+            "type": "object"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "trend": {
+            "enum": [
+              "down",
+              "flat",
+              "up"
+            ],
+            "title": "Trend",
+            "type": "string"
+          },
+          "trend_t": {
+            "title": "Trend T",
+            "type": "number"
+          }
+        },
+        "required": [
+          "symbol",
+          "label",
+          "direction",
+          "trend",
+          "trend_t",
+          "probs",
+          "source",
+          "model_version",
+          "bars_seen"
+        ],
+        "title": "RegimePayload",
+        "type": "object"
+      },
+      "ReliabilityBin": {
+        "properties": {
+          "forecast": {
+            "title": "Forecast",
+            "type": "number"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "observed": {
+            "title": "Observed",
+            "type": "number"
+          }
+        },
+        "required": [
+          "n",
+          "forecast",
+          "observed"
+        ],
+        "title": "ReliabilityBin",
+        "type": "object"
+      },
+      "ReliabilityCurve": {
+        "description": "Held-out forecasts of each class in 10 equal-width bins (empty bins omitted).",
+        "properties": {
+          "down": {
+            "items": {
+              "$ref": "#/components/schemas/ReliabilityBin"
+            },
+            "title": "Down",
+            "type": "array"
+          },
+          "flat": {
+            "items": {
+              "$ref": "#/components/schemas/ReliabilityBin"
+            },
+            "title": "Flat",
+            "type": "array"
+          },
+          "up": {
+            "items": {
+              "$ref": "#/components/schemas/ReliabilityBin"
+            },
+            "title": "Up",
+            "type": "array"
+          }
+        },
+        "required": [
+          "down",
+          "flat",
+          "up"
+        ],
+        "title": "ReliabilityCurve",
+        "type": "object"
+      },
+      "RootResponse": {
+        "properties": {
+          "api": {
+            "title": "Api",
+            "type": "string"
+          },
+          "app": {
+            "title": "App",
+            "type": "string"
+          },
+          "docs": {
+            "title": "Docs",
+            "type": "string"
+          },
+          "health": {
+            "title": "Health",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app",
+          "version",
+          "docs",
+          "health",
+          "api"
+        ],
+        "title": "RootResponse",
+        "type": "object"
+      },
+      "ShapContribution": {
+        "properties": {
+          "feature": {
+            "title": "Feature",
+            "type": "string"
+          },
+          "shap": {
+            "title": "Shap",
+            "type": "number"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "feature",
+          "value",
+          "shap"
+        ],
+        "title": "ShapContribution",
+        "type": "object"
+      },
+      "ShapResponse": {
+        "description": "SHAP of the served ensemble's tree models (raw log-odds, before calibration), averaged.",
+        "properties": {
+          "base_value": {
+            "title": "Base Value",
+            "type": "number"
+          },
+          "contributions": {
+            "items": {
+              "$ref": "#/components/schemas/ShapContribution"
+            },
+            "title": "Contributions",
+            "type": "array"
+          },
+          "models_averaged": {
+            "title": "Models Averaged",
+            "type": "integer"
+          },
+          "predicted_class": {
+            "enum": [
+              "up",
+              "down",
+              "flat"
+            ],
+            "title": "Predicted Class",
+            "type": "string"
+          },
+          "prediction_logit": {
+            "title": "Prediction Logit",
+            "type": "number"
+          },
+          "probability": {
+            "title": "Probability",
+            "type": "number"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "predicted_class",
+          "probability",
+          "models_averaged",
+          "base_value",
+          "prediction_logit",
+          "contributions"
+        ],
+        "title": "ShapResponse",
+        "type": "object"
+      },
+      "SignalRuleResponse": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "cooldown_s": {
+            "title": "Cooldown S",
+            "type": "number"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "enter": {
+            "additionalProperties": true,
+            "title": "Enter",
+            "type": "object"
+          },
+          "enter_text": {
+            "title": "Enter Text",
+            "type": "string"
+          },
+          "exit": {
+            "additionalProperties": true,
+            "title": "Exit",
+            "type": "object"
+          },
+          "exit_text": {
+            "title": "Exit Text",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "impact": {
+            "title": "Impact",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "min_duration_s": {
+            "title": "Min Duration S",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "priority": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Priority",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "priority",
+          "enter",
+          "exit",
+          "enter_text",
+          "exit_text",
+          "min_duration_s",
+          "cooldown_s",
+          "message",
+          "action",
+          "impact",
+          "tags",
+          "enabled",
+          "active"
+        ],
+        "title": "SignalRuleResponse",
+        "type": "object"
+      },
+      "SignalTransitionPayload": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "activated_at_ms": {
+            "title": "Activated At Ms",
+            "type": "integer"
+          },
+          "duration_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration S"
+          },
+          "impact": {
+            "title": "Impact",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "activated",
+              "deactivated"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "priority": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Priority",
+            "type": "string"
+          },
+          "rule_id": {
+            "title": "Rule Id",
+            "type": "string"
+          },
+          "seconds_active": {
+            "title": "Seconds Active",
+            "type": "number"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "ts_ms": {
+            "title": "Ts Ms",
+            "type": "integer"
+          },
+          "values": {
+            "additionalProperties": true,
+            "title": "Values",
+            "type": "object"
+          }
+        },
+        "required": [
+          "rule_id",
+          "name",
+          "priority",
+          "message",
+          "action",
+          "impact",
+          "tags",
+          "activated_at_ms",
+          "seconds_active",
+          "values",
+          "ts_ms",
+          "kind",
+          "duration_s"
+        ],
+        "title": "SignalTransitionPayload",
+        "type": "object"
+      },
+      "SignalsMessage": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SignalsPayload"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "integer"
+          },
+          "type": {
+            "const": "signals",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "type",
+          "data"
+        ],
+        "title": "SignalsMessage",
+        "type": "object"
+      },
+      "SignalsPayload": {
+        "properties": {
+          "active": {
+            "items": {
+              "$ref": "#/components/schemas/ActiveSignalPayload"
+            },
+            "title": "Active",
+            "type": "array"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "transitions": {
+            "items": {
+              "$ref": "#/components/schemas/SignalTransitionPayload"
+            },
+            "title": "Transitions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "symbol",
+          "transitions",
+          "active"
+        ],
+        "title": "SignalsPayload",
+        "type": "object"
+      },
+      "SignalsStateResponse": {
+        "properties": {
+          "active": {
+            "items": {
+              "$ref": "#/components/schemas/ActiveSignalPayload"
+            },
+            "title": "Active",
+            "type": "array"
+          },
+          "recent": {
+            "items": {
+              "$ref": "#/components/schemas/SignalTransitionPayload"
+            },
+            "title": "Recent",
+            "type": "array"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "active",
+          "recent"
+        ],
+        "title": "SignalsStateResponse",
+        "type": "object"
+      },
+      "SnapshotMessage": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SnapshotPayload"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "integer"
+          },
+          "type": {
+            "const": "snapshot",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "type",
+          "data"
+        ],
+        "title": "SnapshotMessage",
+        "type": "object"
+      },
+      "SnapshotPayload": {
+        "properties": {
+          "bars": {
+            "$ref": "#/components/schemas/BarRows"
+          },
+          "book": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BookPayload"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "features": {
+            "$ref": "#/components/schemas/FeaturesPayload"
+          },
+          "prediction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PredictionPayload"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "regime": {
+            "$ref": "#/components/schemas/RegimePayload"
+          },
+          "signals": {
+            "items": {
+              "$ref": "#/components/schemas/ActiveSignalPayload"
+            },
+            "title": "Signals",
+            "type": "array"
+          },
+          "source_status": {
+            "$ref": "#/components/schemas/StatusPayload"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "trades": {
+            "items": {
+              "$ref": "#/components/schemas/TradePayload"
+            },
+            "title": "Trades",
+            "type": "array"
+          }
+        },
+        "required": [
+          "symbol",
+          "features",
+          "book",
+          "bars",
+          "trades",
+          "regime",
+          "signals",
+          "prediction",
+          "source_status"
+        ],
+        "title": "SnapshotPayload",
+        "type": "object"
+      },
+      "SourceStats": {
+        "additionalProperties": true,
+        "description": "Every source reports these; each kind adds its own counters (hosts, steps, file\u2026).",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "time_scale": {
+            "title": "Time Scale",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "time_scale"
+        ],
+        "title": "SourceStats",
+        "type": "object"
+      },
+      "StatusMessage": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StatusPayload"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "integer"
+          },
+          "type": {
+            "const": "status",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "type",
+          "data"
+        ],
+        "title": "StatusMessage",
+        "type": "object"
+      },
+      "StatusPayload": {
+        "properties": {
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "status",
+          "source"
+        ],
+        "title": "StatusPayload",
+        "type": "object"
+      },
+      "StrategyCreate": {
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "strategy_type": {
+            "default": "rule_based",
+            "enum": [
+              "rule_based",
+              "ml_signal",
+              "hybrid"
+            ],
+            "title": "Strategy Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "config"
+        ],
+        "title": "StrategyCreate",
+        "type": "object"
+      },
+      "StrategyExample": {
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "description": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Description",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "config",
+          "description"
+        ],
+        "title": "StrategyExample",
+        "type": "object"
+      },
+      "StrategyResponse": {
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "is_public": {
+            "title": "Is Public",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "strategy_type": {
+            "title": "Strategy Type",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "name",
+          "description",
+          "strategy_type",
+          "config",
+          "is_active",
+          "is_public",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "StrategyResponse",
+        "type": "object"
+      },
+      "StrategyUpdate": {
+        "properties": {
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "strategy_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "rule_based",
+                  "ml_signal",
+                  "hybrid"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategy Type"
+          }
+        },
+        "title": "StrategyUpdate",
+        "type": "object"
+      },
+      "SubscribeMessage": {
+        "properties": {
+          "channels": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "features",
+                    "book",
+                    "trades",
+                    "bars",
+                    "regime",
+                    "prediction",
+                    "signals",
+                    "alerts",
+                    "backtests",
+                    "status"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channels"
+          },
+          "op": {
+            "const": "subscribe",
+            "title": "Op",
+            "type": "string"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          }
+        },
+        "required": [
+          "op"
+        ],
+        "title": "SubscribeMessage",
+        "type": "object"
+      },
+      "SubscribedMessage": {
+        "properties": {
+          "data": {
+            "additionalProperties": true,
+            "title": "Data",
+            "type": "object"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "integer"
+          },
+          "type": {
+            "const": "subscribed",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "type",
+          "data"
+        ],
+        "title": "SubscribedMessage",
+        "type": "object"
+      },
+      "SymbolStats": {
+        "properties": {
+          "bar_ring": {
+            "title": "Bar Ring",
+            "type": "integer"
+          },
+          "bars_closed": {
+            "title": "Bars Closed",
+            "type": "integer"
+          },
+          "book": {
+            "$ref": "#/components/schemas/BookStats"
+          },
+          "clock_skew_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clock Skew Ms"
+          },
+          "connected": {
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "diffs": {
+            "title": "Diffs",
+            "type": "integer"
+          },
+          "dropped_diffs": {
+            "title": "Dropped Diffs",
+            "type": "integer"
+          },
+          "event_rate_per_s": {
+            "title": "Event Rate Per S",
+            "type": "number"
+          },
+          "events": {
+            "title": "Events",
+            "type": "integer"
+          },
+          "intelligence_skipped_bars": {
+            "title": "Intelligence Skipped Bars",
+            "type": "integer"
+          },
+          "ml": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MLRuntimeStats"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "regime": {
+            "$ref": "#/components/schemas/RegimePayload"
+          },
+          "signals_active": {
+            "title": "Signals Active",
+            "type": "integer"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceStats"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "trades": {
+            "title": "Trades",
+            "type": "integer"
+          },
+          "uptime_seconds": {
+            "title": "Uptime Seconds",
+            "type": "number"
+          }
+        },
+        "required": [
+          "symbol",
+          "source",
+          "status",
+          "connected",
+          "book",
+          "events",
+          "trades",
+          "diffs",
+          "dropped_diffs",
+          "event_rate_per_s",
+          "clock_skew_ms",
+          "bars_closed",
+          "bar_ring",
+          "regime",
+          "ml",
+          "intelligence_skipped_bars",
+          "signals_active",
+          "uptime_seconds"
+        ],
+        "title": "SymbolStats",
+        "type": "object"
+      },
+      "SymbolsResponse": {
+        "properties": {
+          "active": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Active",
+            "type": "array"
+          },
+          "allowlist": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowlist",
+            "type": "array"
+          },
+          "default": {
+            "title": "Default",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "active",
+          "default",
+          "allowlist",
+          "source"
+        ],
+        "title": "SymbolsResponse",
+        "type": "object"
+      },
+      "SystemMetricsResponse": {
+        "properties": {
+          "loop": {
+            "$ref": "#/components/schemas/LoopLagStats"
+          },
+          "market": {
+            "$ref": "#/components/schemas/MarketStats"
+          },
+          "ml": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ModelInfoResponse"
+            },
+            "title": "Ml",
+            "type": "object"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "ws": {
+            "$ref": "#/components/schemas/WSStats"
+          }
+        },
+        "required": [
+          "market",
+          "ws",
+          "loop",
+          "ml",
+          "timestamp"
+        ],
+        "title": "SystemMetricsResponse",
+        "type": "object"
+      },
+      "TokenResponse": {
+        "properties": {
+          "access_token": {
+            "title": "Access Token",
+            "type": "string"
+          },
+          "token_type": {
+            "const": "bearer",
+            "default": "bearer",
+            "title": "Token Type",
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserResponse"
+          }
+        },
+        "required": [
+          "access_token",
+          "user"
+        ],
+        "title": "TokenResponse",
+        "type": "object"
+      },
+      "TradePayload": {
+        "properties": {
+          "price": {
+            "title": "Price",
+            "type": "number"
+          },
+          "qty": {
+            "title": "Qty",
+            "type": "number"
+          },
+          "side": {
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "title": "Side",
+            "type": "string"
+          },
+          "trade_id": {
+            "title": "Trade Id",
+            "type": "integer"
+          },
+          "ts_ms": {
+            "title": "Ts Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ts_ms",
+          "price",
+          "qty",
+          "side",
+          "trade_id"
+        ],
+        "title": "TradePayload",
+        "type": "object"
+      },
+      "TradesMessage": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/TradePayload"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "integer"
+          },
+          "type": {
+            "const": "trades",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "type",
+          "data"
+        ],
+        "title": "TradesMessage",
+        "type": "object"
+      },
+      "UnsubscribeMessage": {
+        "properties": {
+          "channels": {
+            "items": {
+              "enum": [
+                "features",
+                "book",
+                "trades",
+                "bars",
+                "regime",
+                "prediction",
+                "signals",
+                "alerts",
+                "backtests",
+                "status"
+              ],
+              "type": "string"
+            },
+            "title": "Channels",
+            "type": "array"
+          },
+          "op": {
+            "const": "unsubscribe",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "channels"
+        ],
+        "title": "UnsubscribeMessage",
+        "type": "object"
+      },
+      "UserCreate": {
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "password": {
+            "maxLength": 72,
+            "minLength": 8,
+            "title": "Password",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 50,
+            "minLength": 3,
+            "pattern": "^[A-Za-z0-9_.-]+$",
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "UserCreate",
+        "type": "object"
+      },
+      "UserResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "is_admin": {
+            "title": "Is Admin",
+            "type": "boolean"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "email",
+          "is_active",
+          "is_admin",
+          "created_at"
+        ],
+        "title": "UserResponse",
+        "type": "object"
+      },
+      "WSClientStats": {
+        "properties": {
+          "backlog": {
+            "title": "Backlog",
+            "type": "integer"
+          },
+          "channels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Channels",
+            "type": "array"
+          },
+          "connected_at_ms": {
+            "title": "Connected At Ms",
+            "type": "integer"
+          },
+          "dropped": {
+            "title": "Dropped",
+            "type": "integer"
+          },
+          "sent": {
+            "title": "Sent",
+            "type": "integer"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "channels",
+          "sent",
+          "dropped",
+          "backlog",
+          "connected_at_ms"
+        ],
+        "title": "WSClientStats",
+        "type": "object"
+      },
+      "WSSchema": {
+        "description": "Container returned by `GET /ws/schema` so both unions appear in OpenAPI.",
+        "properties": {
+          "client": {
+            "discriminator": {
+              "mapping": {
+                "ping": "#/components/schemas/PingMessage",
+                "subscribe": "#/components/schemas/SubscribeMessage",
+                "unsubscribe": "#/components/schemas/UnsubscribeMessage"
+              },
+              "propertyName": "op"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SubscribeMessage"
+              },
+              {
+                "$ref": "#/components/schemas/UnsubscribeMessage"
+              },
+              {
+                "$ref": "#/components/schemas/PingMessage"
+              }
+            ],
+            "title": "Client"
+          },
+          "server": {
+            "discriminator": {
+              "mapping": {
+                "alert": "#/components/schemas/AlertMessage",
+                "backtest_progress": "#/components/schemas/BacktestProgressMessage",
+                "bar": "#/components/schemas/BarMessage",
+                "book": "#/components/schemas/BookMessage",
+                "error": "#/components/schemas/ErrorMessage",
+                "features": "#/components/schemas/FeaturesMessage",
+                "hello": "#/components/schemas/HelloMessage",
+                "pong": "#/components/schemas/PongMessage",
+                "prediction": "#/components/schemas/PredictionMessage",
+                "regime": "#/components/schemas/RegimeMessage",
+                "signals": "#/components/schemas/SignalsMessage",
+                "snapshot": "#/components/schemas/SnapshotMessage",
+                "status": "#/components/schemas/StatusMessage",
+                "subscribed": "#/components/schemas/SubscribedMessage",
+                "trades": "#/components/schemas/TradesMessage"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HelloMessage"
+              },
+              {
+                "$ref": "#/components/schemas/SnapshotMessage"
+              },
+              {
+                "$ref": "#/components/schemas/FeaturesMessage"
+              },
+              {
+                "$ref": "#/components/schemas/BookMessage"
+              },
+              {
+                "$ref": "#/components/schemas/TradesMessage"
+              },
+              {
+                "$ref": "#/components/schemas/BarMessage"
+              },
+              {
+                "$ref": "#/components/schemas/RegimeMessage"
+              },
+              {
+                "$ref": "#/components/schemas/PredictionMessage"
+              },
+              {
+                "$ref": "#/components/schemas/SignalsMessage"
+              },
+              {
+                "$ref": "#/components/schemas/BacktestProgressMessage"
+              },
+              {
+                "$ref": "#/components/schemas/AlertMessage"
+              },
+              {
+                "$ref": "#/components/schemas/StatusMessage"
+              },
+              {
+                "$ref": "#/components/schemas/SubscribedMessage"
+              },
+              {
+                "$ref": "#/components/schemas/PongMessage"
+              },
+              {
+                "$ref": "#/components/schemas/ErrorMessage"
+              }
+            ],
+            "title": "Server"
+          }
+        },
+        "required": [
+          "server",
+          "client"
+        ],
+        "title": "WSSchema",
+        "type": "object"
+      },
+      "WSStats": {
+        "properties": {
+          "clients": {
+            "title": "Clients",
+            "type": "integer"
+          },
+          "per_client": {
+            "items": {
+              "$ref": "#/components/schemas/WSClientStats"
+            },
+            "title": "Per Client",
+            "type": "array"
+          },
+          "total_sent": {
+            "title": "Total Sent",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "clients",
+          "total_sent",
+          "per_client"
+        ],
+        "title": "WSStats",
+        "type": "object"
+      },
+      "WriterStats": {
+        "properties": {
+          "failed_flushes": {
+            "title": "Failed Flushes",
+            "type": "integer"
+          },
+          "queued": {
+            "title": "Queued",
+            "type": "integer"
+          },
+          "written": {
+            "title": "Written",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "written",
+          "failed_flushes",
+          "queued"
+        ],
+        "title": "WriterStats",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "OAuth2PasswordBearer": {
+        "flows": {
+          "password": {
+            "scopes": {},
+            "tokenUrl": "/api/v1/auth/login"
+          }
+        },
+        "type": "oauth2"
+      }
+    }
+  },
+  "info": {
+    "description": "Real-time market-microstructure intelligence: streaming features, order-book analytics, calibrated ML signals, alerts and backtesting.",
+    "title": "AlgoViz",
+    "version": "3.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RootResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Root",
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/api/v1/alerts/history": {
+      "get": {
+        "operationId": "get_history_api_v1_alerts_history_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "`next_before` of the previous page",
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`next_before` of the previous page",
+              "title": "Before"
+            }
+          },
+          {
+            "in": "query",
+            "name": "priority",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Priority"
+            }
+          },
+          {
+            "in": "query",
+            "name": "unacknowledged_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Unacknowledged Only",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertHistoryPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Alert history, newest first",
+        "tags": [
+          "Alerts"
+        ]
+      }
+    },
+    "/api/v1/alerts/history/acknowledge-all": {
+      "post": {
+        "operationId": "acknowledge_all_api_v1_alerts_history_acknowledge_all_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcknowledgeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Acknowledge all alerts",
+        "tags": [
+          "Alerts"
+        ]
+      }
+    },
+    "/api/v1/alerts/history/{alert_id}/acknowledge": {
+      "post": {
+        "operationId": "acknowledge_alert_api_v1_alerts_history__alert_id__acknowledge_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "alert_id",
+            "required": true,
+            "schema": {
+              "title": "Alert Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcknowledgeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Acknowledge alert",
+        "tags": [
+          "Alerts"
+        ]
+      }
+    },
+    "/api/v1/alerts/rules": {
+      "get": {
+        "operationId": "list_rules_api_v1_alerts_rules_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AlertRuleResponse"
+                  },
+                  "title": "Response List Rules Api V1 Alerts Rules Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "List alert rules",
+        "tags": [
+          "Alerts"
+        ]
+      },
+      "post": {
+        "operationId": "create_rule_api_v1_alerts_rules_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertRuleCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertRuleResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Create alert rule",
+        "tags": [
+          "Alerts"
+        ]
+      }
+    },
+    "/api/v1/alerts/rules/{rule_id}": {
+      "delete": {
+        "operationId": "delete_rule_api_v1_alerts_rules__rule_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_id",
+            "required": true,
+            "schema": {
+              "title": "Rule Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Delete alert rule",
+        "tags": [
+          "Alerts"
+        ]
+      },
+      "patch": {
+        "operationId": "update_rule_api_v1_alerts_rules__rule_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_id",
+            "required": true,
+            "schema": {
+              "title": "Rule Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertRuleUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertRuleResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Update alert rule",
+        "tags": [
+          "Alerts"
+        ]
+      }
+    },
+    "/api/v1/analytics/drift": {
+      "get": {
+        "operationId": "get_drift_api_v1_analytics_drift_get",
+        "parameters": [
+          {
+            "description": "Symbol; defaults to the primary symbol",
+            "in": "query",
+            "name": "symbol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 20,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Symbol; defaults to the primary symbol",
+              "title": "Symbol"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 300,
+              "maximum": 2000,
+              "minimum": 10,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DriftResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Realised-outcome drift monitor",
+        "tags": [
+          "Analytics"
+        ]
+      }
+    },
+    "/api/v1/analytics/model-info": {
+      "get": {
+        "operationId": "get_model_info_api_v1_analytics_model_info_get",
+        "parameters": [
+          {
+            "description": "Symbol; defaults to the primary symbol",
+            "in": "query",
+            "name": "symbol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 20,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Symbol; defaults to the primary symbol",
+              "title": "Symbol"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelInfoResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Model status, walk-forward metrics, drift",
+        "tags": [
+          "Analytics"
+        ]
+      }
+    },
+    "/api/v1/analytics/model-registry": {
+      "get": {
+        "operationId": "get_model_registry_api_v1_analytics_model_registry_get",
+        "parameters": [
+          {
+            "description": "Symbol; defaults to the primary symbol",
+            "in": "query",
+            "name": "symbol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 20,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Symbol; defaults to the primary symbol",
+              "title": "Symbol"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "`next_before` of the previous page",
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`next_before` of the previous page",
+              "title": "Before"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelRegistryPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Trained model versions, newest first",
+        "tags": [
+          "Analytics"
+        ]
+      }
+    },
+    "/api/v1/analytics/prediction": {
+      "get": {
+        "operationId": "get_prediction_api_v1_analytics_prediction_get",
+        "parameters": [
+          {
+            "description": "Symbol; defaults to the primary symbol",
+            "in": "query",
+            "name": "symbol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 20,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Symbol; defaults to the primary symbol",
+              "title": "Symbol"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PredictionPayload"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Prediction Api V1 Analytics Prediction Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Latest calibrated prediction",
+        "tags": [
+          "Analytics"
+        ]
+      }
+    },
+    "/api/v1/analytics/regime": {
+      "get": {
+        "operationId": "get_regime_api_v1_analytics_regime_get",
+        "parameters": [
+          {
+            "description": "Symbol; defaults to the primary symbol",
+            "in": "query",
+            "name": "symbol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 20,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Symbol; defaults to the primary symbol",
+              "title": "Symbol"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegimePayload"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Current regime (alias of /market/regime)",
+        "tags": [
+          "Analytics"
+        ]
+      }
+    },
+    "/api/v1/analytics/shap": {
+      "get": {
+        "operationId": "get_shap_api_v1_analytics_shap_get",
+        "parameters": [
+          {
+            "description": "Symbol; defaults to the primary symbol",
+            "in": "query",
+            "name": "symbol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 20,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Symbol; defaults to the primary symbol",
+              "title": "Symbol"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ShapResponse"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Shap Api V1 Analytics Shap Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "SHAP contributions for the latest prediction",
+        "tags": [
+          "Analytics"
+        ]
+      }
+    },
+    "/api/v1/analytics/signals": {
+      "get": {
+        "operationId": "get_signals_api_v1_analytics_signals_get",
+        "parameters": [
+          {
+            "description": "Symbol; defaults to the primary symbol",
+            "in": "query",
+            "name": "symbol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 20,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Symbol; defaults to the primary symbol",
+              "title": "Symbol"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignalsStateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Active signals and recent transitions",
+        "tags": [
+          "Analytics"
+        ]
+      }
+    },
+    "/api/v1/analytics/signals/rules": {
+      "get": {
+        "operationId": "get_signal_rules_api_v1_analytics_signals_rules_get",
+        "parameters": [
+          {
+            "description": "Symbol; defaults to the primary symbol",
+            "in": "query",
+            "name": "symbol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 20,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Symbol; defaults to the primary symbol",
+              "title": "Symbol"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SignalRuleResponse"
+                  },
+                  "title": "Response Get Signal Rules Api V1 Analytics Signals Rules Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Signal rule definitions",
+        "tags": [
+          "Analytics"
+        ]
+      }
+    },
+    "/api/v1/auth/access": {
+      "get": {
+        "description": "Whether this server gates changes, and whether the bearer sent here would pass.",
+        "operationId": "access_api_v1_auth_access_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "May this request make changes?",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Login \u2192 JWT",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "operationId": "me_api_v1_auth_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Current user",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "operationId": "register_api_v1_auth_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Register",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/api/v1/market/bars": {
+      "get": {
+        "operationId": "get_bars_api_v1_market_bars_get",
+        "parameters": [
+          {
+            "description": "Symbol; defaults to the primary symbol",
+            "in": "query",
+            "name": "symbol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 20,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Symbol; defaults to the primary symbol",
+              "title": "Symbol"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start_ms",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Ms"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_ms",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Ms"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 600,
+              "maximum": 7200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BarRows"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "1-second bars (in-memory ring or history)",
+        "tags": [
+          "Market Data"
+        ]
+      }
+    },
+    "/api/v1/market/book": {
+      "get": {
+        "operationId": "get_book_api_v1_market_book_get",
+        "parameters": [
+          {
+            "description": "Symbol; defaults to the primary symbol",
+            "in": "query",
+            "name": "symbol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 20,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Symbol; defaults to the primary symbol",
+              "title": "Symbol"
+            }
+          },
+          {
+            "in": "query",
+            "name": "depth",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Depth",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/BookPayload"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Book Api V1 Market Book Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "L2 order book (top N)",
+        "tags": [
+          "Market Data"
+        ]
+      }
+    },
+    "/api/v1/market/feature-catalog": {
+      "get": {
+        "operationId": "get_feature_catalog_api_v1_market_feature_catalog_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FeatureCatalogEntry"
+                  },
+                  "title": "Response Get Feature Catalog Api V1 Market Feature Catalog Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Feature registry (names, units, allowed operators)",
+        "tags": [
+          "Market Data"
+        ]
+      }
+    },
+    "/api/v1/market/features": {
+      "get": {
+        "operationId": "get_features_api_v1_market_features_get",
+        "parameters": [
+          {
+            "description": "Symbol; defaults to the primary symbol",
+            "in": "query",
+            "name": "symbol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 20,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Symbol; defaults to the primary symbol",
+              "title": "Symbol"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeaturesPayload"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Current streaming features",
+        "tags": [
+          "Market Data"
+        ]
+      }
+    },
+    "/api/v1/market/regime": {
+      "get": {
+        "operationId": "get_regime_api_v1_market_regime_get",
+        "parameters": [
+          {
+            "description": "Symbol; defaults to the primary symbol",
+            "in": "query",
+            "name": "symbol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 20,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Symbol; defaults to the primary symbol",
+              "title": "Symbol"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegimePayload"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Current regime state",
+        "tags": [
+          "Market Data"
+        ]
+      }
+    },
+    "/api/v1/market/stats": {
+      "get": {
+        "operationId": "get_stats_api_v1_market_stats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketStatsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Engine statistics (all symbols)",
+        "tags": [
+          "Market Data"
+        ]
+      }
+    },
+    "/api/v1/market/symbols": {
+      "get": {
+        "operationId": "get_symbols_api_v1_market_symbols_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SymbolsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Active symbols and allowlist",
+        "tags": [
+          "Market Data"
+        ]
+      }
+    },
+    "/api/v1/market/trades": {
+      "get": {
+        "operationId": "get_trades_api_v1_market_trades_get",
+        "parameters": [
+          {
+            "description": "Symbol; defaults to the primary symbol",
+            "in": "query",
+            "name": "symbol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 20,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Symbol; defaults to the primary symbol",
+              "title": "Symbol"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TradePayload"
+                  },
+                  "title": "Response Get Trades Api V1 Market Trades Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Recent trades",
+        "tags": [
+          "Market Data"
+        ]
+      }
+    },
+    "/api/v1/strategies": {
+      "get": {
+        "operationId": "list_strategies_api_v1_strategies_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StrategyResponse"
+                  },
+                  "title": "Response List Strategies Api V1 Strategies Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "List strategies",
+        "tags": [
+          "Strategies"
+        ]
+      },
+      "post": {
+        "operationId": "create_strategy_api_v1_strategies_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StrategyCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Create strategy",
+        "tags": [
+          "Strategies"
+        ]
+      }
+    },
+    "/api/v1/strategies/examples": {
+      "get": {
+        "operationId": "list_examples_api_v1_strategies_examples_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StrategyExample"
+                  },
+                  "title": "Response List Examples Api V1 Strategies Examples Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Example strategy specs",
+        "tags": [
+          "Strategies"
+        ]
+      }
+    },
+    "/api/v1/strategies/{strategy_id}": {
+      "delete": {
+        "operationId": "delete_strategy_api_v1_strategies__strategy_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "strategy_id",
+            "required": true,
+            "schema": {
+              "title": "Strategy Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Delete strategy",
+        "tags": [
+          "Strategies"
+        ]
+      },
+      "get": {
+        "operationId": "get_strategy_api_v1_strategies__strategy_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "strategy_id",
+            "required": true,
+            "schema": {
+              "title": "Strategy Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Get strategy",
+        "tags": [
+          "Strategies"
+        ]
+      },
+      "patch": {
+        "operationId": "update_strategy_api_v1_strategies__strategy_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "strategy_id",
+            "required": true,
+            "schema": {
+              "title": "Strategy Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StrategyUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Update strategy",
+        "tags": [
+          "Strategies"
+        ]
+      }
+    },
+    "/api/v1/strategies/{strategy_id}/backtest": {
+      "post": {
+        "operationId": "run_backtest_api_v1_strategies__strategy_id__backtest_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "strategy_id",
+            "required": true,
+            "schema": {
+              "title": "Strategy Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BacktestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many backtests running or queued"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Run a backtest (async; progress streams on the `backtests` WS channel)",
+        "tags": [
+          "Strategies"
+        ]
+      }
+    },
+    "/api/v1/strategies/{strategy_id}/backtests": {
+      "get": {
+        "operationId": "list_backtests_api_v1_strategies__strategy_id__backtests_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "strategy_id",
+            "required": true,
+            "schema": {
+              "title": "Strategy Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "`next_before` of the previous page",
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`next_before` of the previous page",
+              "title": "Before"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "List backtests, newest first",
+        "tags": [
+          "Strategies"
+        ]
+      }
+    },
+    "/api/v1/strategies/{strategy_id}/backtests/{backtest_id}": {
+      "get": {
+        "operationId": "get_backtest_api_v1_strategies__strategy_id__backtests__backtest_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "strategy_id",
+            "required": true,
+            "schema": {
+              "title": "Strategy Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "backtest_id",
+            "required": true,
+            "schema": {
+              "title": "Backtest Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Backtest detail with trades and equity curve",
+        "tags": [
+          "Strategies"
+        ]
+      }
+    },
+    "/api/v1/system/metrics": {
+      "get": {
+        "operationId": "system_metrics_api_v1_system_metrics_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemMetricsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Runtime metrics for the Settings page",
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/api/v1/ws/schema": {
+      "get": {
+        "description": "Exists so the server\u2192client and client\u2192server WebSocket message unions are part of the OpenAPI document (and therefore the generated TypeScript types). Always 204.",
+        "operationId": "ws_schema_api_v1_ws_schema_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WSSchema"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "204": {
+            "description": "No content \u2014 see components.schemas.WSSchema"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "WebSocket message schemas (OpenAPI anchor; responds 204)",
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/health/live": {
+      "get": {
+        "operationId": "health_live_health_live_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LivenessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Health Live",
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "health_ready_health_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not ready"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Health Ready",
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/metrics": {
+      "get": {
+        "operationId": "metrics_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Prometheus metrics",
+        "tags": [
+          "System"
+        ]
+      }
+    }
+  }
+}

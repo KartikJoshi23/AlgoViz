@@ -1,0 +1,293 @@
+@import "tailwindcss";
+@import "./ds.css";
+
+/* ═══════════════════════════════════════════════════════════════════
+   AlgoViz — design tokens ("midnight glass")
+
+   A deep-navy terminal: surfaces step up in light and warmth, panels carry a
+   gradient body and a lit edge, and a slow aurora behind them takes the
+   regime's colour. Colour still carries meaning only:
+     bid / ask / mid   the order book's own semantics (marks; *-text for type)
+     regime-0…3        one violet hue, calm → extreme (an ordinal ramp)
+     good…critical     reserved status scale, always shipped with a label
+     accent / brand    interaction (focus, selection, primary actions) and
+                       the product's own chrome (icons, the wordmark)
+
+   Every data colour was validated with the data-viz six checks against the
+   panel surface: bid/mid/ask pass all-pairs (worst CVD ΔE 11.6, normal-vision
+   ΔE 18.7, all ≥ 3:1); the regime ramp passes the ordinal checks; the *-text
+   steps and every ink but "disabled" clear WCAG AA (≥ 4.5:1) on every
+   surface up to "active".
+   ═══════════════════════════════════════════════════════════════════ */
+@theme {
+  /* surfaces — a navy ramp; a panel runs panel-top → panel down its height */
+  --color-page: #060911;
+  --color-panel: #111826; /* a panel's mid-tone, for sticky parts drawn over it */
+  --color-panel-top: #141b2a;
+  --color-panel-bottom: #0f1522;
+  --color-raised: #161e2e;
+  --color-control: #1b2436;
+  --color-active: #243049;
+  --color-well: #0a0f1a; /* inputs and tracks sit below the panel */
+  --color-line: rgba(148, 170, 220, 0.1);
+  --color-line-strong: rgba(148, 170, 220, 0.18);
+
+  /* ink (contrast on panel-top: 15.8 · 9.4 · 6.5 · 3.2 — the last is for disabled only) */
+  --color-ink: #f2f5fb;
+  --color-ink-muted: #b6c0d2;
+  --color-ink-faint: #949fb4;
+  --color-ink-disabled: #5f6b82;
+
+  /* market semantics — marks, and a lighter step for text */
+  --color-bid: #1fa98f;
+  --color-bid-text: #3dd2b1;
+  --color-ask: #cf1940;
+  --color-ask-text: #ff7a8c;
+  --color-mid: #be871a;
+  --color-mid-text: #e9ae45;
+
+  /* interaction and brand */
+  --color-accent: #5b8cff;
+  --color-accent-strong: #3b66e0;
+  --color-accent-text: #8fb2ff;
+  --color-brand: #9b7bff; /* the violet end of the brand gradient */
+
+  /* status — fixed scale, never used for series */
+  --color-good: #2ec27e;
+  --color-warning: #f4c542;
+  --color-serious: #fb8c3c;
+  --color-critical: #f04b4b;
+
+  /* regime — ordinal ramp, calm → extreme */
+  --color-regime-0: #6a55cf;
+  --color-regime-1: #8470e6;
+  --color-regime-2: #9f8ef6;
+  --color-regime-3: #bdb0ff;
+
+  /* type — Geist Sans for UI, Geist Mono for columns and axes */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "JetBrains Mono", monospace;
+  --text-caption: 0.6875rem; /* 11 — axes, dense tables */
+  --text-meta: 0.75rem; /* 12 — labels, metadata */
+  --text-body: 0.8125rem; /* 13 — body, controls */
+  --text-ui: 0.875rem; /* 14 — panel titles */
+  --text-title: 1rem; /* 16 */
+  --text-h2: 1.25rem; /* 20 */
+  --text-h1: 1.625rem; /* 26 — page titles */
+  --text-stat: 1.75rem; /* 28 — stat values */
+  --text-display: 2rem; /* 32 */
+
+  /* geometry */
+  --radius-panel: 14px;
+  --radius-control: 9px;
+  --radius-badge: 999px;
+
+  /* motion */
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* The regime colour animates (a slow cross-fade) when the regime changes. */
+@property --regime {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #6a55cf;
+}
+
+:root {
+  color-scheme: dark;
+  --regime: var(--color-regime-0); /* set live from the regime (AmbientLayer) */
+  --accent-intensity: 1; /* ambient tint strength (Settings) */
+  --highlight: rgba(255, 255, 255, 0.06); /* top-edge light on raised surfaces */
+  --edge: rgba(160, 182, 235, 0.2); /* the lit top of a panel's border */
+  --brand-gradient: linear-gradient(135deg, var(--color-accent) 0%, var(--color-brand) 100%);
+}
+
+html {
+  min-height: 100%;
+  background: var(--color-page);
+  transition: --regime 1.6s ease; /* the ambient tint cross-fades on a regime change */
+}
+
+body {
+  min-height: 100dvh;
+  /* no background: <html> paints the page, and the fixed ambient layer
+     (negative z-index) sits between it and the content */
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: clip; /* clip, not hidden: hidden would make <body> the scroll container */
+}
+
+/* ── Ambient background ──────────────────────────────────────────
+   One fixed layer. The base is a night gradient; over it, an aurora — the
+   brand blue from the left, the live regime colour from the right, a trace
+   of bid teal low down — drifts very slowly (a composited transform, off
+   under reduced motion and on low-tier GPUs). A fine grid fades out from
+   the top, and film grain keeps large dark areas from banding. */
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(120% 80% at 50% 0%, #0b1122 0%, var(--color-page) 70%);
+}
+.ambient::before {
+  content: "";
+  position: absolute;
+  inset: -20% -10%;
+  opacity: clamp(0, var(--accent-intensity), 1);
+  background:
+    radial-gradient(42% 38% at 18% 8%, color-mix(in oklab, var(--color-accent) 30%, transparent), transparent 72%),
+    radial-gradient(40% 36% at 84% 6%, color-mix(in oklab, var(--regime) 38%, transparent), transparent 72%),
+    radial-gradient(36% 30% at 62% 92%, color-mix(in oklab, var(--color-bid) 10%, transparent), transparent 72%),
+    radial-gradient(30% 26% at 6% 78%, color-mix(in oklab, var(--color-brand) 9%, transparent), transparent 72%);
+  will-change: transform;
+  animation: aurora 48s ease-in-out infinite alternate;
+}
+.ambient::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(148, 170, 220, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 170, 220, 0.045) 1px, transparent 1px),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.05 0'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>");
+  background-size:
+    44px 44px,
+    44px 44px,
+    160px 160px;
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, #000 10%, rgba(0, 0, 0, 0.35) 60%, rgba(0, 0, 0, 0.2) 100%);
+  -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, #000 10%, rgba(0, 0, 0, 0.35) 60%, rgba(0, 0, 0, 0.2) 100%);
+}
+@keyframes aurora {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(3%, 2%, 0) scale(1.06);
+  }
+  100% {
+    transform: translate3d(-3%, 1%, 0) scale(1.02);
+  }
+}
+/* low-tier GPUs keep the aurora but not its drift (one static layer) */
+html[data-tier="low"] .ambient::before {
+  animation: none;
+  will-change: auto;
+}
+
+/* ── Motion ──────────────────────────────────────────────────────── */
+/* rows that arrive live (signals, alerts) settle in */
+.enter {
+  animation: enter 0.35s var(--ease-out-quint) both;
+}
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* tick flash: a brief wash behind a live value on an up/down tick */
+[data-tick="up"] {
+  animation: tick-up 0.8s var(--ease-out-quint);
+}
+[data-tick="down"] {
+  animation: tick-down 0.8s var(--ease-out-quint);
+}
+@keyframes tick-up {
+  0% {
+    background-color: color-mix(in oklab, var(--color-bid) 30%, transparent);
+  }
+}
+@keyframes tick-down {
+  0% {
+    background-color: color-mix(in oklab, var(--color-ask) 30%, transparent);
+  }
+}
+
+@keyframes pulse-dot {
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes live-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* The OS preference and the in-app setting (`data-motion` on <html>, set by
+   Providers from the effective preference) both switch CSS motion off. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+html[data-motion="reduced"],
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
+/* ── Base ────────────────────────────────────────────────────────── */
+::selection {
+  background: color-mix(in oklab, var(--color-accent) 38%, transparent);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 170, 220, 0.2) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(148, 170, 220, 0.2);
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 170, 220, 0.34);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Numerals that sit in columns or update live: tabular so they never jitter. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Text in the brand gradient (the wordmark, page eyebrows). */
+.brand-text {
+  background: var(--brand-gradient);
+  background-clip: text; /* unprefixed only; the build adds -webkit- where needed */
+  color: transparent;
+}

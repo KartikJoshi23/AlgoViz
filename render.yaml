@@ -1,28 +1,39 @@
-# ═══════════════════════════════════════════════════════════════════
-# AlgoViz — Render Deployment (Backend)
-# ═══════════════════════════════════════════════════════════════════
-# Render will auto-detect this file and configure the service.
-# Dashboard: https://dashboard.render.com
-# ═══════════════════════════════════════════════════════════════════
-
+# AlgoViz — Render deployment (backend).
+# Region: Singapore — Binance returns HTTP 451 to US-region IPs.
 services:
   - type: web
     name: algoviz-backend
     runtime: python
-    region: singapore  # Binance blocks US IPs (HTTP 451); Singapore has full access
+    region: singapore
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    # The app believes X-Forwarded-For only from TRUSTED_PROXIES (Render's proxy sits on a
+    # private address); uvicorn's own handling is off so a client can't pick its address.
+    startCommand: uvicorn algoviz.main:app --host 0.0.0.0 --port $PORT --no-proxy-headers
+    # Liveness, not readiness: readiness also requires Binance to be reachable, and a
+    # geo-block must not make Render restart a healthy process in a loop.
+    healthCheckPath: /health/live
+    autoDeploy: true
     envVars:
       - key: ENVIRONMENT
         value: production
-      - key: DEBUG
-        value: "false"
       - key: LOG_LEVEL
         value: INFO
+      - key: LOG_JSON
+        value: "true"
       - key: SECRET_KEY
         generateValue: true
+      # Bearer token for changes (strategies, alert rules, backtests). Copy it from the
+      # dashboard into the frontend's Settings → Access; reads stay public.
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: TRUSTED_PROXIES
+        value: '["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.1"]'
+      # Hosted persistence (D5): Render's disk is ephemeral, so point this at a Postgres
+      # instance, e.g. postgresql+asyncpg://user:pass@host/db (migrations run at startup).
+      - key: DATABASE_URL
+        sync: false
+      - key: DATA_SOURCE
+        value: live
       - key: PYTHON_VERSION
         value: "3.11.9"
-    healthCheckPath: /health
-    autoDeploy: true

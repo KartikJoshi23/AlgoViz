@@ -1,0 +1,980 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Design system — component layer
+
+   Three elevation tiers: panel (a navy gradient body inside a lit edge — the
+   border is brightest along the top — with a soft drop shadow), raised (a
+   step lighter, for content inside a panel) and float (frosted glass — only
+   for what hovers over content: the app bar, menus, the command palette,
+   toasts, tooltips; opaque on low-tier GPUs). Controls sit in wells below
+   the surface; the selected or primary state is lifted and lit in the
+   accent. Every interactive element has hover, focus, pressed and disabled
+   states.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Tailwind utilities (e.g. h-full, px-0) override these. */
+@layer components {
+  /* ── Surfaces ────────────────────────────────────────────────────── */
+  .panel {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    border: 1px solid transparent;
+    border-radius: var(--radius-panel);
+    background:
+      linear-gradient(180deg, var(--color-panel-top), var(--color-panel-bottom)) padding-box,
+      linear-gradient(180deg, var(--edge), var(--color-line) 38%, rgba(148, 170, 220, 0.07)) border-box;
+    box-shadow:
+      inset 0 1px 0 var(--highlight),
+      0 1px 2px rgba(0, 0, 0, 0.45),
+      0 20px 44px -28px rgba(0, 0, 0, 0.9);
+  }
+  .panel-header {
+    display: flex;
+    min-height: 52px;
+    flex-shrink: 0;
+    flex-wrap: wrap; /* on narrow screens the actions drop below the title */
+    align-items: center;
+    gap: 8px 12px;
+    border-bottom: 1px solid var(--color-line);
+    padding: 10px 16px;
+  }
+  /* the section's glyph: a small lit chip in the brand gradient */
+  .panel-icon {
+    display: inline-grid;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    place-items: center;
+    margin-right: -2px;
+    border: 1px solid color-mix(in oklab, var(--color-accent) 34%, transparent);
+    border-radius: 8px;
+    background: linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--color-accent) 26%, transparent),
+      color-mix(in oklab, var(--color-brand) 12%, transparent)
+    );
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      0 0 18px -6px color-mix(in oklab, var(--color-accent) 60%, transparent);
+    color: var(--color-accent-text);
+  }
+  .panel-title {
+    flex-shrink: 0;
+    font-size: var(--text-ui);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--color-ink);
+  }
+  .panel-meta {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-meta);
+    color: var(--color-ink-faint);
+  }
+  .panel-actions {
+    margin-left: auto;
+    display: flex;
+    max-width: 100%;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .panel-body {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    padding: 0 16px 16px;
+  }
+  .panel-header + .panel-body {
+    padding-top: 14px;
+  }
+  .panel-body[data-flush] {
+    padding: 0;
+  }
+  .panel-footer {
+    flex-shrink: 0;
+    border-top: 1px solid var(--color-line);
+    border-radius: 0 0 calc(var(--radius-panel) - 1px) calc(var(--radius-panel) - 1px);
+    background: rgba(6, 9, 17, 0.28);
+    padding: 9px 16px;
+    font-size: var(--text-meta);
+    color: var(--color-ink-faint);
+  }
+
+  .raised {
+    border: 1px solid var(--color-line);
+    border-radius: 10px;
+    background: linear-gradient(180deg, #19223a, var(--color-raised));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+  /* a raised tile that is itself the control (template cards, pickers) */
+  button.raised,
+  a.raised {
+    cursor: pointer;
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease,
+      box-shadow 140ms ease;
+  }
+  button.raised:hover,
+  a.raised:hover {
+    border-color: color-mix(in oklab, var(--color-accent) 40%, transparent);
+    background: linear-gradient(180deg, #1e2942, var(--color-control));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 0 0 3px color-mix(in oklab, var(--color-accent) 10%, transparent);
+  }
+  button.raised:active,
+  a.raised:active {
+    background: var(--color-active);
+  }
+
+  .float {
+    border: 1px solid rgba(160, 182, 235, 0.16);
+    background: color-mix(in oklab, #0d1320 84%, transparent);
+    /* unprefixed only: the build adds the -webkit- copy where a target needs it
+       (declaring both let it keep just the prefixed one, which Chrome ignores) */
+    backdrop-filter: blur(20px) saturate(160%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 24px 56px -20px rgba(0, 0, 0, 0.85);
+  }
+
+  /* the app bar's lower edge: a hairline lit in the brand gradient */
+  .appbar::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 -1px;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklab, var(--color-accent) 55%, transparent) 30%,
+      color-mix(in oklab, var(--color-brand) 45%, transparent) 70%,
+      transparent
+    );
+    pointer-events: none;
+  }
+
+  /* the wordmark's glyph: book lines on a night tile inside a brand-gradient edge */
+  .brand-mark {
+    display: block;
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    border-radius: 9px;
+    background: var(--brand-gradient);
+    box-shadow: 0 0 20px -6px var(--color-accent);
+    padding: 1px;
+  }
+  .brand-mark > span {
+    position: relative;
+    display: block;
+    height: 100%;
+    border-radius: 8px;
+    background: radial-gradient(circle at 30% 20%, #16203a, var(--color-page) 75%);
+  }
+  /* the active route's underline, slid between links by GSAP */
+  .nav-indicator {
+    pointer-events: none;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    border-radius: 999px;
+    background: var(--brand-gradient);
+    box-shadow: 0 0 12px color-mix(in oklab, var(--color-accent) 80%, transparent);
+  }
+
+  /* ── Type roles ──────────────────────────────────────────────────── */
+  .field-label {
+    font-size: var(--text-meta);
+    font-weight: 500;
+    color: var(--color-ink-muted);
+  }
+  .hint {
+    font-size: var(--text-meta);
+    color: var(--color-ink-faint);
+  }
+  .col-head {
+    font-size: var(--text-caption);
+    font-weight: 500;
+    color: var(--color-ink-faint);
+  }
+  /* small upper-case label over a value or a page title */
+  .eyebrow {
+    font-size: var(--text-caption);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-ink-faint);
+  }
+
+  /* ── Buttons ─────────────────────────────────────────────────────── */
+  .btn {
+    display: inline-flex;
+    height: 32px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1px solid var(--color-line-strong);
+    border-radius: var(--radius-control);
+    background: linear-gradient(180deg, #212c44, #1a2336);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.07),
+      0 1px 2px rgba(0, 0, 0, 0.35);
+    padding: 0 12px;
+    color: var(--color-ink);
+    font-size: var(--text-body);
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease,
+      box-shadow 140ms ease,
+      color 140ms ease,
+      transform 120ms ease,
+      filter 140ms ease;
+  }
+  .btn:hover {
+    border-color: rgba(160, 182, 235, 0.32);
+    background: linear-gradient(180deg, #28354f, #202a40);
+  }
+  .btn:active {
+    transform: scale(0.98);
+  }
+  .btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+    transform: none;
+    filter: none;
+  }
+  .btn-primary {
+    border-color: rgba(143, 178, 255, 0.35);
+    background: linear-gradient(135deg, var(--color-accent-strong), #4a4fd6);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      0 6px 18px -8px color-mix(in oklab, var(--color-accent) 80%, transparent);
+    color: #fff;
+  }
+  .btn-primary:hover {
+    border-color: rgba(173, 198, 255, 0.55);
+    background: linear-gradient(135deg, var(--color-accent-strong), #4a4fd6);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.24),
+      0 8px 24px -8px color-mix(in oklab, var(--color-accent) 95%, transparent);
+    filter: brightness(1.1);
+  }
+  .btn-danger {
+    border-color: color-mix(in oklab, var(--color-critical) 45%, transparent);
+    background: color-mix(in oklab, var(--color-critical) 14%, transparent);
+    box-shadow: none;
+    color: #ffb3b3;
+  }
+  .btn-danger:hover {
+    border-color: color-mix(in oklab, var(--color-critical) 70%, transparent);
+    background: color-mix(in oklab, var(--color-critical) 24%, transparent);
+  }
+  .btn-ghost {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    color: var(--color-ink-muted);
+  }
+  .btn-ghost:hover {
+    border-color: transparent;
+    background: rgba(148, 170, 220, 0.09);
+    color: var(--color-ink);
+  }
+  .btn-sm {
+    height: 28px;
+    padding: 0 10px;
+    font-size: var(--text-meta);
+  }
+  .btn-icon {
+    width: 32px;
+    padding: 0;
+  }
+  .btn-sm.btn-icon {
+    width: 28px;
+  }
+
+  /* ── Badges ──────────────────────────────────────────────────────── */
+  /* Pills. Text stays in ink; a glowing dot and a tint carry the tone. */
+  .badge {
+    --tone: transparent;
+    display: inline-flex;
+    height: 22px;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--color-line-strong);
+    border-radius: var(--radius-badge);
+    background: rgba(148, 170, 220, 0.06);
+    padding: 0 9px;
+    color: var(--color-ink-muted);
+    font-size: var(--text-meta);
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .badge[data-tone] {
+    border-color: color-mix(in oklab, var(--tone) 42%, transparent);
+    background: color-mix(in oklab, var(--tone) 15%, transparent);
+    color: var(--color-ink);
+  }
+  .badge[data-tone]::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: var(--tone);
+    box-shadow: 0 0 8px color-mix(in oklab, var(--tone) 80%, transparent);
+  }
+  .badge[data-tone="bid"] {
+    --tone: var(--color-bid);
+  }
+  .badge[data-tone="ask"] {
+    --tone: var(--color-ask);
+  }
+  .badge[data-tone="mid"] {
+    --tone: var(--color-mid);
+  }
+  .badge[data-tone="accent"] {
+    --tone: var(--color-accent);
+  }
+  .badge[data-tone="brand"] {
+    --tone: var(--color-brand);
+  }
+  .badge[data-tone="good"] {
+    --tone: var(--color-good);
+  }
+  .badge[data-tone="warning"] {
+    --tone: var(--color-warning);
+  }
+  .badge[data-tone="serious"] {
+    --tone: var(--color-serious);
+  }
+  .badge[data-tone="critical"] {
+    --tone: var(--color-critical);
+  }
+  .badge[data-tone="regime-0"] {
+    --tone: var(--color-regime-0);
+  }
+  .badge[data-tone="regime-1"] {
+    --tone: var(--color-regime-1);
+  }
+  .badge[data-tone="regime-2"] {
+    --tone: var(--color-regime-2);
+  }
+  .badge[data-tone="regime-3"] {
+    --tone: var(--color-regime-3);
+  }
+
+  /* a badge that toggles (condition values, filters) */
+  button.badge {
+    cursor: pointer;
+    transition:
+      border-color 140ms ease,
+      background-color 140ms ease,
+      color 140ms ease;
+  }
+  button.badge:hover {
+    border-color: rgba(160, 182, 235, 0.34);
+    background: rgba(148, 170, 220, 0.1);
+    color: var(--color-ink);
+  }
+  button.badge[data-tone]:hover {
+    border-color: color-mix(in oklab, var(--tone) 65%, transparent);
+    background: color-mix(in oklab, var(--tone) 22%, transparent);
+  }
+  button.badge:active {
+    background: var(--color-active);
+  }
+  button.badge:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  /* z-score readout: quiet until the value is unusual (|z| ≥ 2) */
+  .zbadge {
+    display: inline-flex;
+    height: 20px;
+    align-items: center;
+    border: 1px solid transparent;
+    border-radius: var(--radius-badge);
+    padding: 0 7px;
+    color: var(--color-ink-faint);
+    font-family: var(--font-mono);
+    font-size: var(--text-caption);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .zbadge[data-level="elevated"] {
+    border-color: color-mix(in oklab, var(--color-warning) 40%, transparent);
+    background: color-mix(in oklab, var(--color-warning) 15%, transparent);
+    color: var(--color-ink);
+  }
+  .zbadge[data-level="warming"] {
+    color: var(--color-ink-faint); /* informational text, so AA: "z —" marks the state */
+  }
+
+  /* a signed change: tinted in the direction's market colour */
+  .delta-pill {
+    display: inline-flex;
+    height: 20px;
+    align-items: center;
+    gap: 2px;
+    border-radius: 999px;
+    background: rgba(148, 170, 220, 0.08);
+    padding: 0 7px 0 5px;
+    color: var(--color-ink-faint);
+    font-family: var(--font-mono);
+    font-size: var(--text-caption);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .delta-pill[data-direction="up"] {
+    background: color-mix(in oklab, var(--color-bid) 17%, transparent);
+    color: var(--color-bid-text);
+  }
+  .delta-pill[data-direction="down"] {
+    background: color-mix(in oklab, var(--color-ask) 17%, transparent);
+    color: var(--color-ask-text);
+  }
+
+  /* ── Inputs ──────────────────────────────────────────────────────── */
+  .input {
+    height: 32px;
+    width: 100%;
+    border: 1px solid var(--color-line-strong);
+    border-radius: var(--radius-control);
+    background: var(--color-well);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+    padding: 0 10px;
+    color: var(--color-ink);
+    font-size: var(--text-body);
+    transition:
+      border-color 140ms ease,
+      box-shadow 140ms ease;
+  }
+  textarea.input {
+    height: auto;
+    padding: 8px 10px;
+  }
+  .input::placeholder {
+    color: var(--color-ink-disabled);
+  }
+  .input:hover {
+    border-color: rgba(160, 182, 235, 0.32);
+  }
+  .input:focus {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow:
+      inset 0 1px 2px rgba(0, 0, 0, 0.35),
+      0 0 0 3px color-mix(in oklab, var(--color-accent) 28%, transparent);
+  }
+  .input:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  .select {
+    appearance: none;
+    padding-right: 28px;
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--color-ink-faint) 50%),
+      linear-gradient(135deg, var(--color-ink-faint) 50%, transparent 50%);
+    background-position:
+      calc(100% - 14px) 52%,
+      calc(100% - 10px) 52%;
+    background-size:
+      4px 4px,
+      4px 4px;
+    background-repeat: no-repeat;
+    cursor: pointer;
+  }
+  .select option {
+    background: var(--color-panel);
+    color: var(--color-ink);
+  }
+
+  /* ── Segmented control ───────────────────────────────────────────── */
+  .segmented {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    border: 1px solid var(--color-line);
+    border-radius: 10px;
+    background: var(--color-well);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+    padding: 3px;
+  }
+  .segment {
+    height: 26px;
+    border-radius: 7px;
+    padding: 0 11px;
+    color: var(--color-ink-faint);
+    font-size: var(--text-meta);
+    font-weight: 500;
+    cursor: pointer;
+    transition:
+      background-color 140ms ease,
+      box-shadow 140ms ease,
+      color 140ms ease;
+  }
+  .segment:hover {
+    background: rgba(148, 170, 220, 0.08);
+    color: var(--color-ink);
+  }
+  .segment[aria-selected="true"] {
+    background: linear-gradient(180deg, #2c3a5a, #232f49);
+    color: var(--color-ink);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.09),
+      0 0 0 1px color-mix(in oklab, var(--color-accent) 30%, transparent),
+      0 2px 6px rgba(0, 0, 0, 0.4);
+  }
+  .segment:active {
+    background: var(--color-active);
+  }
+  .segment:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  /* ── Switch ──────────────────────────────────────────────────────── */
+  .switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    cursor: pointer;
+  }
+  .switch-track {
+    position: relative;
+    width: 34px;
+    height: 20px;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 999px;
+    background: var(--color-well);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease,
+      box-shadow 180ms ease;
+  }
+  .switch-track::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    background: var(--color-ink-faint);
+    transition:
+      transform 200ms var(--ease-out-quint),
+      background-color 180ms ease;
+  }
+  .switch:hover .switch-track {
+    border-color: rgba(160, 182, 235, 0.36);
+  }
+  .switch[aria-checked="true"] .switch-track {
+    border-color: rgba(143, 178, 255, 0.4);
+    background: var(--brand-gradient);
+    box-shadow: 0 0 14px -4px color-mix(in oklab, var(--color-accent) 85%, transparent);
+  }
+  .switch[aria-checked="true"] .switch-track::after {
+    transform: translateX(14px);
+    background: #fff;
+  }
+  .switch:active .switch-track::after {
+    width: 15px; /* the knob squashes while pressed */
+  }
+  .switch[aria-checked="true"]:active .switch-track::after {
+    transform: translateX(11px);
+  }
+  .switch:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  /* ── Slider ──────────────────────────────────────────────────────── */
+  .slider {
+    width: 100%;
+    height: 20px;
+    accent-color: var(--color-accent);
+    cursor: pointer;
+  }
+  .slider:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  /* ── Navigation ──────────────────────────────────────────────────── */
+  .nav-link {
+    display: inline-flex;
+    height: 32px;
+    align-items: center;
+    gap: 7px;
+    border-radius: var(--radius-control);
+    padding: 0 11px;
+    color: var(--color-ink-faint);
+    font-size: var(--text-body);
+    font-weight: 500;
+    transition:
+      background-color 140ms ease,
+      color 140ms ease;
+  }
+  .nav-link:hover {
+    background: rgba(148, 170, 220, 0.08);
+    color: var(--color-ink);
+  }
+  .nav-link[data-active="true"] {
+    background: color-mix(in oklab, var(--color-accent) 13%, transparent);
+    color: var(--color-ink);
+  }
+  .nav-link[data-active="true"] > svg {
+    color: var(--color-accent-text);
+  }
+  .nav-link:active {
+    background: var(--color-active);
+  }
+
+  /* ── Rows (lists, tapes, ladders) ────────────────────────────────── */
+  .row {
+    border-radius: 7px;
+    transition: background-color 120ms ease;
+  }
+  .row:hover {
+    background: rgba(148, 170, 220, 0.06);
+  }
+  .row[aria-current="true"],
+  .row[data-selected] {
+    background: color-mix(in oklab, var(--color-accent) 14%, transparent);
+    box-shadow: inset 2px 0 0 var(--color-accent);
+  }
+  button.row {
+    cursor: pointer;
+  }
+  button.row:active {
+    background: var(--color-active);
+  }
+
+  /* ── Condition chips (strategy builder) ──────────────────────────── */
+  /* One condition = one pill: feature ▸ operator ▸ value ▸ remove. */
+  .cond-chip {
+    display: inline-flex;
+    min-height: 32px;
+    max-width: 100%;
+    flex-wrap: wrap; /* multi-value conditions wrap their options inside the chip */
+    align-items: center;
+    gap: 2px 2px;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 16px;
+    background: linear-gradient(180deg, #1b2439, var(--color-raised));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    padding: 3px 3px 3px 10px;
+    transition:
+      border-color 140ms ease,
+      box-shadow 140ms ease;
+  }
+  .cond-chip:hover {
+    border-color: rgba(160, 182, 235, 0.34);
+  }
+  .cond-chip:focus-within {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent) 20%, transparent);
+  }
+  .cond-part {
+    appearance: none;
+    flex-shrink: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    padding: 2px 4px;
+    color: var(--color-ink);
+    font-size: var(--text-body);
+    cursor: pointer;
+  }
+  .cond-part:hover {
+    background: rgba(148, 170, 220, 0.1);
+  }
+  .cond-part option {
+    background: var(--color-panel);
+    color: var(--color-ink);
+  }
+  .cond-op {
+    min-width: 24px; /* WCAG 2.2 target size */
+    text-align: center;
+    color: var(--color-accent-text);
+    font-family: var(--font-mono);
+    font-weight: 600;
+  }
+  .cond-value {
+    width: 5.25rem;
+    height: 24px;
+    border: 1px solid var(--color-line);
+    border-radius: 999px;
+    background: var(--color-well);
+    padding: 0 8px;
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: var(--text-body);
+    text-align: right;
+  }
+  .cond-value:focus {
+    outline: none;
+    border-color: var(--color-accent);
+  }
+
+  /* ── Data table ──────────────────────────────────────────────────── */
+  /* A scrolling wrapper is focusable (tabindex="0") so keyboards can scroll it. */
+  .table-wrap {
+    overflow: auto;
+    border: 1px solid var(--color-line);
+    border-radius: 10px;
+    background: rgba(6, 9, 17, 0.22);
+  }
+  .data-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: var(--text-body);
+  }
+  .data-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    border-bottom: 1px solid var(--color-line-strong);
+    background: var(--color-raised);
+    padding: 9px 10px;
+    color: var(--color-ink-faint);
+    font-size: var(--text-caption);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .data-table td {
+    border-top: 1px solid var(--color-line);
+    padding: 7px 10px;
+    color: var(--color-ink);
+    white-space: nowrap;
+  }
+  .data-table tbody tr:first-child td {
+    border-top: 0;
+  }
+  .data-table .cell-num {
+    text-align: right;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+  .data-table tbody tr {
+    transition: background-color 120ms ease;
+  }
+  .data-table tbody tr:hover {
+    background: rgba(148, 170, 220, 0.05);
+  }
+  .data-table tbody tr[data-selected] {
+    background: color-mix(in oklab, var(--color-accent) 14%, transparent);
+  }
+
+  /* ── Status dot ──────────────────────────────────────────────────── */
+  .status-dot {
+    position: relative;
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: var(--color-ink-disabled);
+  }
+  .status-dot[data-status="good"] {
+    background: var(--color-good);
+    box-shadow: 0 0 8px color-mix(in oklab, var(--color-good) 70%, transparent);
+  }
+  /* a live feed breathes: a ring that expands and fades (a composited transform) */
+  .status-dot[data-status="good"]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--color-good);
+    animation: live-ring 2.4s ease-out infinite;
+  }
+  .status-dot[data-status="warning"] {
+    background: var(--color-warning);
+    box-shadow: 0 0 8px color-mix(in oklab, var(--color-warning) 60%, transparent);
+    animation: pulse-dot 1.4s ease-in-out infinite;
+  }
+  .status-dot[data-status="critical"] {
+    background: var(--color-critical);
+    box-shadow: 0 0 8px color-mix(in oklab, var(--color-critical) 60%, transparent);
+  }
+
+  /* ── Divider, tooltip, keyboard hint, skeleton ───────────────────── */
+  .divider {
+    height: 1px;
+    flex-shrink: 0;
+    background: var(--color-line);
+  }
+
+  .tooltip-host {
+    position: relative;
+  }
+  .tooltip {
+    pointer-events: none;
+    position: absolute;
+    z-index: 60;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    width: max-content;
+    max-width: 260px;
+    translate: -50% 4px;
+    border-radius: var(--radius-control);
+    padding: 6px 9px;
+    color: var(--color-ink);
+    font-size: var(--text-meta);
+    line-height: 1.4;
+    opacity: 0;
+    transition:
+      opacity 120ms ease,
+      translate 160ms var(--ease-out-quint);
+  }
+  .tooltip[data-side="bottom"] {
+    top: calc(100% + 8px);
+    bottom: auto;
+    translate: -50% -4px;
+  }
+  .tooltip-host:hover > .tooltip,
+  .tooltip-host:focus-within > .tooltip {
+    opacity: 1;
+    translate: -50% 0;
+  }
+  .tooltip[data-align="end"] {
+    left: auto;
+    right: 0;
+    translate: 0 4px;
+  }
+  .tooltip[data-align="end"][data-side="bottom"] {
+    translate: 0 -4px;
+  }
+  .tooltip-host:hover > .tooltip[data-align="end"],
+  .tooltip-host:focus-within > .tooltip[data-align="end"] {
+    translate: 0 0;
+  }
+
+  .kbd {
+    display: inline-flex;
+    height: 20px;
+    min-width: 20px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-line-strong);
+    border-bottom-width: 2px;
+    border-radius: 6px;
+    background: var(--color-raised);
+    padding: 0 5px;
+    color: var(--color-ink-faint);
+    font-family: var(--font-mono);
+    font-size: var(--text-caption);
+  }
+
+  .skeleton {
+    border-radius: var(--radius-control);
+    background: linear-gradient(90deg, rgba(148, 170, 220, 0.05) 25%, rgba(148, 170, 220, 0.11) 50%, rgba(148, 170, 220, 0.05) 75%);
+    background-position: 200% 0;
+    background-size: 200% 100%;
+    animation: shimmer 1.8s linear infinite;
+  }
+
+  /* ── Stat tile ───────────────────────────────────────────────────── */
+  .stat-value {
+    font-size: var(--text-stat);
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    font-variant-numeric: tabular-nums; /* live values must not jitter */
+    border-radius: 6px;
+  }
+  .stat-unit {
+    color: var(--color-ink-faint);
+    font-size: var(--text-meta);
+    font-weight: 500;
+  }
+}
+
+/* ── Drawer ──────────────────────────────────────────────────────────
+   A side sheet for forms that would otherwise push the page around. It
+   floats over content, so it is the one solid-surface overlay with a dim
+   backdrop; motion is a short slide that the reduced-motion rules flatten.
+   Stacking: app bar 40 · tooltips 60 · drawer 70/71 · command palette 75 ·
+   toasts 80 (a form's error toast must show above the form). */
+@layer components {
+  .drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    background: rgba(3, 5, 10, 0.66);
+    animation: drawer-fade 160ms ease both;
+  }
+  .drawer {
+    position: fixed;
+    inset: 0 0 0 auto;
+    z-index: 71;
+    display: flex;
+    width: min(560px, 100vw);
+    flex-direction: column;
+    border-left: 1px solid rgba(160, 182, 235, 0.18);
+    background: linear-gradient(180deg, var(--color-panel-top), var(--color-panel-bottom));
+    box-shadow: -32px 0 72px -24px rgba(0, 0, 0, 0.9);
+    animation: drawer-in 240ms var(--ease-out-quint) both;
+  }
+  .drawer:focus {
+    outline: none;
+  }
+}
+@keyframes drawer-in {
+  from {
+    transform: translateX(28px);
+    opacity: 0;
+  }
+}
+@keyframes drawer-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Low-tier GPUs: floats are near-opaque instead of blurred, and nothing loops. */
+html[data-tier="low"] .float {
+  background: rgba(13, 19, 32, 0.97);
+  backdrop-filter: none;
+}
+html[data-tier="low"] .status-dot::after {
+  animation: none;
+  opacity: 0;
+}
+
+/* A selected row's surface is lighter, so its faintest ink steps up to keep AA
+   contrast. Unlayered on purpose: it has to beat the text-ink-faint utility. */
+.row[aria-current="true"] .text-ink-faint,
+.row[data-selected] .text-ink-faint,
+.data-table tbody tr[data-selected] .text-ink-faint {
+  color: var(--color-ink-muted);
+}

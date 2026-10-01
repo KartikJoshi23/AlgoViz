@@ -20,8 +20,13 @@ env/
 
 # ── Node / Frontend ──────────────────────────────────────────────
 node_modules/
-frontend/dist/
-frontend/.vite/
+frontend/.next/
+frontend/out/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+frontend/next-env.d.ts
+*.tsbuildinfo
 .npm
 .pnpm-store/
 
@@ -41,12 +46,15 @@ frontend/.vite/
 
 # ── Databases ────────────────────────────────────────────────────
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
 
-# ── ML Models (regenerated at runtime) ───────────────────────────
-backend/ml_models/*.joblib
-backend/ml_models/*.pkl
+# ── Runtime state (regenerated) ──────────────────────────────────
+backend/data/
+backend/ml_models/
+backend/data/recordings/
 
 # ── OS Files ─────────────────────────────────────────────────────
 .DS_Store
@@ -63,3 +71,14 @@ docker-compose.override.yml
 
 # ── Legacy / Deprecated ──────────────────────────────────────────
 .streamlit/
+
+# ── Tooling caches ────────────────────────────────────────────────
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+frontend/lighthouse/
