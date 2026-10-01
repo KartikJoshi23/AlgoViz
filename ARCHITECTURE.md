@@ -106,13 +106,18 @@ address, resolved only through `TRUSTED_PROXIES`, with stricter buckets for
 writes and backtests. *Consequence.* The operator pastes the token into the
 frontend (Settings → Access); it stays in that browser.
 
-### ADR-7 · SQLite locally, Postgres hosted
+### ADR-7 · SQLite on a persistent disk; Postgres optional
 
-*Context.* Render's disk is ephemeral. *Decision.* SQLite with WAL for local
-and Docker use. Postgres via `DATABASE_URL` (asyncpg) for hosted deployments.
-Alembic migrations run at startup and are written to work on both.
-*Consequence.* Migrations avoid SQLite-only SQL; batch operations cover the
-ALTERs SQLite can't do.
+*Context.* A hosted instance's own filesystem is ephemeral, and the trained
+models live on disk as well as the database. A free instance also sleeps,
+which stops the feed. *Decision* (revised 2026-10-01, implementation-plan §11):
+the hosted backend is an always-on instance with a persistent disk holding
+SQLite (WAL) and the model store, as it is locally and in Docker. Postgres via
+`DATABASE_URL` (asyncpg) stays supported. Alembic migrations run at startup and
+are written to work on both. *Consequence.* One process owns the database, so
+the service can't scale out, and a deploy restarts it briefly; neither matters
+for a single-operator, single-feed service. Migrations avoid SQLite-only SQL;
+batch operations cover the ALTERs SQLite can't do.
 
 ### ADR-8 · WebGL only where depth carries information
 

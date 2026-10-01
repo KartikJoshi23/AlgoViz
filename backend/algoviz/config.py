@@ -45,14 +45,14 @@ class Settings(BaseSettings):
 
     # ── Server ───────────────────────────────────────────────────────
     PORT: int = 8000
+    # Local dev servers and the production frontend. Every origin here is also trusted by
+    # the WebSocket allowlist, so list only sites we run.
     CORS_ORIGINS: list[str] = [
         "http://localhost:3000",
         "http://localhost:3002",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3002",
         "https://algorithmic-viz.vercel.app",
-        "https://algoviz.vercel.app",
-        "https://algo-viz.vercel.app",
     ]
     # Opt-in pattern for preview deployments (e.g. r"https://algoviz-[a-z0-9-]+\.vercel\.app").
     # None by default: a host-wide wildcard would admit every site on that host.

@@ -1,10 +1,15 @@
-# AlgoViz — Render deployment (backend).
+# AlgoViz — Render deployment (backend), created as a Blueprint (New → Blueprint).
 # Region: Singapore — Binance returns HTTP 451 to US-region IPs.
+#
+# Always on, with a persistent disk: the live feed, the bar history and the trained
+# models must survive deploys and restarts (a free instance sleeps after 15 idle
+# minutes and loses its disk). SQLite and the model store live on the disk.
 services:
   - type: web
     name: algoviz-backend
     runtime: python
     region: singapore
+    plan: 1c-2g # 1 CPU / 2 GB: a training run peaks near 430 MB beside the server
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     # The app believes X-Forwarded-For only from TRUSTED_PROXIES (Render's proxy sits on a
@@ -14,6 +19,11 @@ services:
     # geo-block must not make Render restart a healthy process in a loop.
     healthCheckPath: /health/live
     autoDeploy: true
+    # Only data under the mount path survives a deploy. 60 days of 1 s bars is ~2.6 GB.
+    disk:
+      name: algoviz-data
+      mountPath: /var/data
+      sizeGB: 5
     envVars:
       - key: ENVIRONMENT
         value: production
@@ -29,10 +39,19 @@ services:
         generateValue: true
       - key: TRUSTED_PROXIES
         value: '["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.1"]'
-      # Hosted persistence (D5): Render's disk is ephemeral, so point this at a Postgres
-      # instance, e.g. postgresql+asyncpg://user:pass@host/db (migrations run at startup).
+      # The production frontend; the WebSocket allowlist follows it.
+      - key: CORS_ORIGINS
+        value: '["https://algorithmic-viz.vercel.app"]'
       - key: DATABASE_URL
-        sync: false
+        value: sqlite+aiosqlite:////var/data/algoviz.db
+      - key: ML_MODEL_DIR
+        value: /var/data/ml_models
+      # Bars are the edge study's data set (implementation-plan §11, W5).
+      - key: SNAPSHOT_RETENTION_DAYS
+        value: "60"
+      # os.cpu_count() reports the host's cores, not the instance's one CPU.
+      - key: ML_TRAIN_THREADS
+        value: "1"
       - key: DATA_SOURCE
         value: live
       - key: PYTHON_VERSION

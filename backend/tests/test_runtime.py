@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 import time
 from collections.abc import Awaitable
 from pathlib import Path
@@ -118,6 +119,12 @@ async def test_run_isolated_returns_raises_and_times_out() -> None:
     with pytest.raises(WorkerTimeout):
         await run_isolated(time.sleep, 60, timeout_s=4)
     assert time.monotonic() - t0 < 30  # the sleeping child was terminated, not waited for
+
+
+@pytest.mark.skipif(not hasattr(os, "nice"), reason="scheduling priority is POSIX-only")
+async def test_isolated_work_yields_the_cpu_to_the_server() -> None:
+    # os.nice(0) reports the caller's niceness: the child runs 10 steps below the server
+    assert await run_isolated(os.nice, 0, timeout_s=60) == os.nice(0) + 10
 
 
 async def test_inference_worker_runs_single_threaded_openmp() -> None:

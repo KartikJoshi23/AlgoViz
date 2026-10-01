@@ -15,7 +15,10 @@ CPU-heavy work never runs on the event loop.
 - `run_isolated()` — runs a picklable function in a freshly **spawned**
   process (model training, HMM fitting) with capped BLAS/OpenMP threads and a
   hard timeout. The child shares neither the GIL nor the thread pools with the
-  server, and exits afterwards so its memory goes back to the OS.
+  server, and exits afterwards so its memory goes back to the OS. On POSIX it
+  also runs at a lower scheduling priority: on a single-CPU host (the hosted
+  backend) a fit at equal priority would take half the core from the loop
+  that carries the feed.
 - `run_in_thread()` — the same call shape in a thread, for callers that are
   already off the server loop (the backtester's synthetic history generator).
 """
@@ -43,6 +46,7 @@ Offload = Callable[..., Awaitable[Any]]
 
 _SPAWN = multiprocessing.get_context("spawn")
 _JOIN_TIMEOUT_S = 5.0
+_CHILD_NICENESS = 10  # POSIX nice increment for isolated work; the server keeps priority
 
 
 class WorkerError(RuntimeError):
@@ -93,6 +97,8 @@ def _child_main(
     try:
         from threadpoolctl import threadpool_limits
 
+        if hasattr(os, "nice"):  # POSIX only; Windows has no nice()
+            os.nice(_CHILD_NICENESS)
         with threadpool_limits(limits=threads):
             result = fn(*args)
         conn.send((True, result))

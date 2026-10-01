@@ -206,7 +206,7 @@ backend/
     api/         market, analytics, strategies, alerts, auth, system     ws/  hub
     core/        time, logging, auth, middleware, problems, metrics, workers, looplag, users, conditions
     schemas/     rest, ws                  db/  session, migrations, types  models/
-  alembic/  scripts/ (export_openapi, record_stream, seed_e2e)  tests/  Dockerfile  pyproject.toml
+  alembic/  scripts/ (export_openapi, record_stream, seed_e2e, smoke_deploy)  tests/  Dockerfile  pyproject.toml
 frontend/
   app/           routes (/, /book, /intelligence, /strategies, /alerts, /settings), globals.css (tokens), ds.css (components)
   components/    ds (design system), panels, charts, three (Terrain, shaders), conditions, strategies, alerts, intelligence, ui
@@ -220,12 +220,25 @@ ARCHITECTURE.md  CHANGELOG.md  CLAUDE.md (hand-off notes)  docs/implementation-p
 
 ## Deployment
 
-- **Backend → Render** — `render.yaml` provisions a Python web service in Singapore (Binance returns 451 to US IPs). It generates `SECRET_KEY` and `ADMIN_TOKEN`, trusts forwarded addresses only from Render's private proxy ranges, and health-checks `/health/live`.
-  - Render's disk is ephemeral, so set `DATABASE_URL` to a Postgres instance (`postgres://…` URLs are accepted and use asyncpg); migrations run at startup.
+- **Backend → Render** — create it as a **Blueprint** (New → Blueprint, this repo) so `render.yaml` is the source of truth. It provisions an always-on Python web service in Singapore (Binance returns 451 to US IPs).
+  - Instance and storage:
+    - 1 CPU / 2 GB, with a 5 GB persistent disk at `/var/data`.
+    - SQLite and the model store live on the disk, so bars, predictions and trained models survive deploys and restarts. Render snapshots the disk daily.
+    - Bars are kept 60 days. Migrations run at startup.
+    - A disk rules out zero-downtime deploys: each deploy restarts the service briefly.
+  - Configuration:
+    - It generates `SECRET_KEY` and `ADMIN_TOKEN`.
+    - It trusts forwarded addresses only from Render's private proxy ranges.
+    - It allows the production frontend's origin in CORS and on the WebSocket.
+    - It health-checks `/health/live`.
   - Paste the generated `ADMIN_TOKEN` into the frontend's Settings → Access to make changes.
   - Add `DISCORD_WEBHOOK_URL` if you want alert deliveries.
   - Scrape `/metrics` with Prometheus if you run one.
-- **Frontend → Vercel** — import the repo with **Root Directory** `frontend`, framework Next.js, and set `NEXT_PUBLIC_API_URL=https://<backend>.onrender.com` and `NEXT_PUBLIC_WS_URL=wss://<backend>.onrender.com/ws`. Add the frontend's origin to the backend's `CORS_ORIGINS` (the WebSocket allowlist follows it); for preview deployments, set a narrow `CORS_ORIGIN_REGEX`.
+  - Postgres is supported too: set `DATABASE_URL` (`postgres://…` URLs are accepted and use asyncpg). Keep `ML_MODEL_DIR` on a persistent disk either way, or every restart retrains.
+- **Frontend → Vercel** — import the repo with **Root Directory** `frontend`. `frontend/vercel.json` pins the Next.js build.
+  - Set `NEXT_PUBLIC_API_URL=https://<backend>.onrender.com` and `NEXT_PUBLIC_WS_URL=wss://<backend>.onrender.com/ws` for Production. A production build without them fails on purpose, rather than shipping a site that talks to localhost.
+  - Add the frontend's origin to the backend's `CORS_ORIGINS` (the WebSocket allowlist follows it). For preview deployments, set a narrow `CORS_ORIGIN_REGEX`.
+- **Check a deployment** — `python backend/scripts/smoke_deploy.py https://<backend>`. It confirms the deployed version, readiness, that changes are gated, and the CORS and WebSocket origin checks. With `ADMIN_TOKEN` set and `--with-token`, it also makes a change and deletes it again.
 - **Anywhere → Docker** — both images are multi-stage and non-root; the frontend image takes the browser-facing backend origin as build args (see `docker-compose.yml`).
 
 ---

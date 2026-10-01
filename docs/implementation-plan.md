@@ -1,6 +1,6 @@
 # AlgoViz — Overhaul Implementation Plan
 
-> **Status:** approved (revision 2, post-audit). Development proceeds stage by stage per §7. Stages A–F delivered (§9). **Phase 4 (§10) approved 2026-09-24 with all recommendations (D1–D6); Stages G, J, K, L, H and M delivered, plus the theme v3 overhaul (§10.6): Phase 4 is complete, Stage M awaiting review.**
+> **Status:** approved (revision 2, post-audit). Development proceeds stage by stage per §7. Stages A–F delivered (§9). **Phase 4 (§10) approved 2026-09-24 with all recommendations (D1–D6); Stages G, J, K, L, H and M delivered, plus the theme v3 overhaul (§10.6): Phase 4 is complete, and Stage M was approved 2026-10-01. Phase 5 (§11) was approved 2026-10-01; Stage N's repository side is delivered and awaits review and cutover.**
 > **Scope:** complete overhaul of `AlgoViz-Professional/` — core algorithmic engine, backend architecture, and a full frontend rebuild on Next.js + React + Three.js/WebGL + GSAP with a glassmorphism dark theme tied to the product's purpose.
 > **Supersedes:** `implementation_plan.md.resolved` (the stale plan from the earlier Streamlit → FastAPI/React migration).
 
@@ -473,7 +473,7 @@ Each stage ends with a review stop; nothing proceeds without sign-off.
 
 ## 10. Phase 4 — Professional hardening & visual redesign (proposed)
 
-> **Status:** approved 2026-09-24 with every recommendation in §10.5. Stages G, J, K, L, H and M delivered, plus a theme v3 overhaul (§10.6); Phase 4 complete, Stage M awaiting review. Stages G–M keep §7's review-stop discipline.
+> **Status:** approved 2026-09-24 with every recommendation in §10.5. Stages G, J, K, L, H and M delivered, plus a theme v3 overhaul (§10.6); Phase 4 complete; Stage M approved 2026-10-01. Stages G–M keep §7's review-stop discipline.
 > **Inputs:** the Phase 1 takeover audit (2026-09-23: gates, live and synthetic runs, py-spy profile) and a real-GPU screenshot review of every route at 1440×900 and 390×844.
 
 ### 10.1 Why
@@ -995,3 +995,215 @@ Deviations and limits:
   - Errors are problem+json.
   - Production needs a token for writes.
   - The CORS wildcard is gone, so a preview frontend needs `CORS_ORIGIN_REGEX`.
+
+---
+
+## 11. Phase 5 — Ship, harden, and test the model for an edge (proposed)
+
+> **Status:** approved 2026-10-01 with every recommendation in §11.4. Stage N's repository side is delivered (§11.5) and awaits review and the owner's cutover. Stages keep §7's review-stop discipline.
+> **Inputs:** the 2026-10-01 takeover audit:
+> - every gate re-run locally, and CI #1 on `3d542f4`;
+> - the GitHub commit and deployment statuses, and the production URLs;
+> - a live Binance run with memory sampling through a training run;
+> - real-GPU captures of every route at 1440×900 and 390×844.
+
+### 11.1 Why
+
+**Production and operations:**
+
+| # | Finding | Evidence |
+|---|---|---|
+| 1 | The rebuild is not live. Vercel's production deploys of `ba73a7c` and `3d542f4` failed about 50 s after each push, and the Render backend still serves 2.0.0 | Commit status "Vercel: failure" (project `algo-viz`). `algorithmic-viz.vercel.app` serves the old Vite bundle. `algoviz-52q2.onrender.com/` reports `"version":"2.0.0"`, and `/health/live` returns 404 |
+| 2 | Likely causes, unconfirmed without the dashboard logs: (a) the Vercel project still carries the Vite preset that `frontend/vercel.json` used to set; (b) the Render service was made by hand, so it still starts `uvicorn main:app` and has no `ADMIN_TOKEN` | The old `frontend/vercel.json` set `framework: vite` and `outputDirectory: dist`. The service's name (`algoviz-52q2`) is not the Blueprint's `algoviz-backend`. See `render.yaml` at `e8379bc` |
+| 3 | Render's free tier does not fit this workload: the live feed and training stop whenever nobody is watching | Free web services sleep after 15 min without inbound traffic, lose their disk on every restart or sleep, and have 512 MB. Free Postgres expires after 30 days. Measured locally (Windows working set, 2 s samples): server ≈ 266 MB plus training child ≈ 157 MB, ≈ 423 MB at peak |
+| 4 | Model artefacts live on the instance's disk. On an ephemeral disk, every deploy, restart or sleep retrains, and a persistent Postgres registry would collect repeated version numbers | `ML_MODEL_DIR = BASE_DIR / "ml_models"`; versions are numbered from the files in that directory |
+| 5 | Two of the three default CORS origins are other people's sites, and the WebSocket allowlist follows them | `algoviz.vercel.app` is a Gatsby site called "Algoviz"; `algo-viz.vercel.app` is "Explorer: search visualization!". Only `algorithmic-viz.vercel.app` is ours |
+| 6 | Dependency automation can merge untested majors | Dependabot PR #9 bundles TypeScript 5.9 → 7.0, ESLint 9 → 10 and `@types/node` 22 → 26 with patch bumps. PRs #2 (Python 3.14 image) and #4 (Node 26 image) are green only because CI builds those images without running anything in them. Every Dependabot branch triggers a Vercel preview, and they all fail |
+| 7 | CI's runner and actions are about to change underneath it | CI annotations: actions@v4 target the deprecated Node 20, and `ubuntu-latest` becomes Ubuntu 26 on 2026-10-19 |
+
+**Correctness and honesty:**
+
+| # | Finding | Evidence |
+|---|---|---|
+| 8 | Synthetic backtest history is capped at 600 bars, whatever `BACKTEST_SYNTHETIC_BARS` says (default 3,600). The generator simulates them all, then returns the engine's 600-bar chart ring | `backtest/service.py:71`: asked for 900, got 600. e2e asks for 600, so it can't see the cap |
+| 9 | The drift monitor compares the live hit rate with uniform chance (33 %), but the model is mostly right because it calls "flat": its 77 % hit rate is the flat share of that window. The log-loss tile beside it is honest | `DriftPanel.tsx:57,78`. Live: hit rate 77.2 %, realised flat share 77 %, edge vs the prior −0.055 |
+| 10 | Trade frames keep only the last 100 fills of each 100 ms tick, and the dropped ones are not counted | `market/service.py:331`. Live 1 s bars reach 942 trades (p99.9 707), so bursts exceed the cap |
+| 11 | e2e and `frontend-prod` run `next start` on a standalone build. Next warns that this "does not work", and the `server.js` that Docker ships is never exercised. §10.2 (T6) says e2e runs against the standalone server | The e2e web-server log |
+| 12 | Stale docs | The README opens with the orbitable terrain, trade-flow particles and glass panels, which ADR-8 and theme v3 replaced (`README.md:7,36`), and still has a "Visual identity — Depth" section (`:129`). An e2e test named for the terrain checks the heatmap (`e2e/pages.spec.ts:26`), and a smoke-test comment still describes the old terrain fallback |
+
+**Reliability and hygiene:**
+
+| # | Finding | Evidence |
+|---|---|---|
+| 13 | The backend suite can hang on Windows inside `test_ml_engine`, after the model has trained, and nothing times it out | 1 hang in 2 full runs, killed after 9 min: the event loop was idle, with no child process. The test alone and the rest of the suite pass. CI (Linux) passed |
+| 14 | Python builds are not reproducible, and one directly imported package is undeclared | Only direct dependencies are pinned; transitive ones (numba, llvmlite and pandas, via shap) float. `threadpoolctl` is imported directly but not declared |
+| 15 | `export_openapi.py` writes CRLF on Windows, so regenerating the contracts always shows a diff | `git status` after an export, with identical JSON |
+| 16 | Small drift in the engine | `book_payload` and `_adaptive_band` read the global `settings` rather than the engine's `cfg`. Snapshot requests are fire-and-forget tasks with no reference kept (`market/service.py:322,550,575`) |
+
+**The model:**
+
+| # | Finding | Evidence |
+|---|---|---|
+| 17 | "No edge at 5 s" rests on 3.2 h of live data. Retention deletes bars after 7 days, so the data set can never grow past a week | `data/algoviz.db` holds 11,599 bars in 8 sessions over 4 days. `SNAPSHOT_RETENTION_DAYS=7` |
+| 18 | With four days of data, the hour-of-day features effectively identify the session | SHAP ranks `hour_cos` first (v39) |
+| 19 | The class mix drifts, so a static training prior is a weak baseline. The honest comparator is the prior known at prediction time (trailing) | The prior's own log-loss falls from 0.93 to 0.34 across folds (§10.6, Stage H) |
+
+**Experience:**
+
+| # | Finding | Evidence |
+|---|---|---|
+| 20 | The hero heatmap is empty for 3 minutes after every page load, because its history is kept client-side | Real-GPU captures |
+| 21 | Some read-outs are truncated | Real-GPU captures: the model card's drift line ("edg…"), "Trade velo…" on mobile, and "at the touch or the ho…" |
+
+### 11.2 Workstreams
+
+**W1 — Ship and verify (findings 1–5).**
+- Repo side:
+  - `frontend/vercel.json` pins `framework: "nextjs"`, which overrides the dashboard preset, so a stale preset can't break the build again.
+  - The CORS defaults keep localhost and the production origin only (E2).
+  - `render.yaml` states its plan and, under E1(b), mounts a disk for `data/` and `ml_models/`.
+  - If E1 keeps Postgres instead: model artefacts (0.4–0.5 MB each) are stored on their registry row (`ml_models.artifact`, a migration) and loaded from there when the file is missing. Versions are numbered from the registry, not the directory.
+  - The README's deployment section and the CLAUDE.md checklist are rewritten for the chosen hosting.
+- Owner side:
+  - Vercel: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL`, root directory `frontend`.
+  - Render: the service per E3.
+  - The push to `main`, which deploys.
+- Verification once deployed:
+  - `/health/ready`.
+  - The site loads live data over WSS from the Vercel origin.
+  - A change is refused without the token and accepted with it.
+  - A restart serves the stored model without retraining.
+  - Memory through a training run.
+
+**W2 — Correctness and honesty (8–10, 12, 16).**
+- Synthetic backtest history: the generator collects every closed bar instead of reading the chart ring. A regression test asks for more than 600 bars.
+- Drift monitor: the backend also reports the prior's hit rate over the same window (always calling the prior's most likely class). The tile and the chart compare against that, and "chance 33 %" goes. Contracts regenerated.
+- Trades:
+  - Count what the per-tick cap drops (stats and `/metrics`).
+  - Then send every fill, and let the hub's existing backpressure (oldest trade batches dropped first) protect slow clients.
+  - Measured on the live feed before and after.
+- The engine reads `cfg` instead of `settings`, and keeps a reference to each snapshot-request task until it finishes.
+- Docs: the README's intro, tagline and visual-identity section; stale e2e names and comments.
+
+**W3 — Test and CI reliability (6, 7, 11, 13–15).**
+- The hang:
+  - Reproduce it with the asyncio task-stack dump used in the audit, find the cause, fix it, and add a regression guard.
+  - `faulthandler_timeout` (built into pytest) makes any future hang dump its stacks.
+  - `timeout-minutes` on every CI job.
+- e2e and `frontend-prod` run the standalone `server.js`, with the static and public assets copied as the Dockerfile does.
+- Dependabot: minor and patch updates grouped, majors one PR each. Docker base images held at Python 3.11 and Node 22 until they are moved deliberately, with CI testing them.
+- CI: current major versions of the actions; the runner pinned (`ubuntu-24.04`) instead of `ubuntu-latest`.
+- Python: a constraints file of the full resolved set, used by Docker and Render (E5); `threadpoolctl` declared.
+- `export_openapi.py` writes LF.
+- With permission (E6): Linux visual baselines, and the migration chain against a real Postgres.
+
+**W4 — Heatmap history and read-outs (20, 21).**
+- The engine keeps the last 3 minutes of depth-profile columns at 1 Hz, whether or not anyone subscribes: 180 columns × 128 bins, plus each column's mid, band and traded quantity, about 0.1–0.2 MB as JSON.
+- The client fills its heat ring from that once, with a REST read on mount, so the hero is complete on first paint. Backfilled columns are 1 s wide; live columns stay at 5 Hz.
+- Layouts that fit the truncated read-outs.
+
+**W5 — Does the model have an edge? (17–19).**
+- Data:
+  - Keep live bars long enough to answer the question: retention raised for the live database.
+  - `scripts/export_bars.py` writes bars to gzipped NDJSON, so they outlive retention.
+  - Target: at least 7 continuous days (E7).
+- `scripts/ml_study.py`:
+  - Rebuilds the served feature vectors from stored bars, with the same code.
+  - Labels them for a grid of definitions: horizons of 5, 15, 30, 60 and 120 s; barrier floors of 0.5, 1, 2 and 4 bps; k ∈ {0.5, 1, 2}.
+  - Ablations: without the hour-of-day features, and without the median-scaled quantities.
+  - Runs the served recipe (`fit_model`) walk-forward on every configuration.
+- Baselines:
+  - the training prior;
+  - the **trailing prior**: class shares over the last N resolved labels, known at prediction time;
+  - the logistic baseline.
+  - Every fold reports its edge, with dispersion.
+- Selection is kept honest:
+  - The grid is explored on the earlier ~75 % of the data, and the chosen configuration is scored **once** on the untouched last ~25 %.
+  - Pre-registered rule: adopt it only if its edge over the trailing prior is positive in at least 3 of 4 folds and on the final holdout.
+- Outcome:
+  - If adopted: new defaults, a feature-schema bump where features change, a retrain, and UI copy.
+  - If not: the finding becomes "no edge at any tested horizon on N days", recorded here, and the UI keeps saying so.
+  - Either way, the trailing-prior baseline ships on the Intelligence page and in the drift monitor.
+
+### 11.3 Stages
+
+Stage letters continue from Phase 4, skipping O (as I was skipped).
+
+| Stage | Scope | Reviewable outcome |
+|---|---|---|
+| **N — Ship** | W1 | The production URLs serve 3.0.0 end to end, verified against the checklist. Needs E1–E3 and your push |
+| **P — Correctness and honesty** | W2 | Each finding has a test that failed before the fix; the drift panel compares with the prior's hit rate; trade drops measured on the live feed |
+| **Q — Reliability** | W3 | The hang root-caused, or bounded and documented; e2e green on the standalone server; CI pinned; Dependabot regrouped |
+| **R — Heatmap history** | W4 | The hero complete on first paint (real-GPU captures, before and after); no truncated read-outs at 1440 and 390 px; axe clean |
+| **S — Edge study** | W5 | A study report: the grid, the holdout result, and the decision made by the pre-registered rule |
+
+**Proposed order: N → P → Q → R → S.**
+- Data collection for S starts now: it needs days of continuous feed and costs nothing to start.
+- N goes first because production still runs the pre-rebuild app.
+- P comes before Q because its fixes are small and user-visible.
+- S comes last because it waits for the data.
+
+### 11.4 Decisions needed
+
+| # | Question | Recommendation |
+|---|---|---|
+| E1 | Backend hosting | **(b)** An always-on Render instance with a 1 GB persistent disk, SQLite on the disk: the simplest durable setup, with no Postgres expiry. A disk means a short restart on each deploy.<br>• 1 CPU / 2 GB ($25/month) for training headroom.<br>• 0.5 CPU / 512 MB ($7/month) also works, with slower training and about 90 MB of headroom.<br>Alternatives: **(a)** free tier with Postgres, which sleeps and loses models; **(c)** paid instance with paid Postgres, which also works, with W1's artefact-in-database change |
+| E2 | Production frontend origin | `https://algorithmic-viz.vercel.app`, plus a custom domain if there is one. Drop the other two defaults |
+| E3 | The Render service | Recreate it from `render.yaml` as a Blueprint, so the repo is the source of truth. The hand-made service keeps its old settings |
+| E4 | Open Dependabot PRs | Close #9, #2 and #4. Fold the action bumps (#1, #3, #5–#7) into Stage Q's CI change, after which those PRs close too |
+| E5 | Python lock | A `constraints.txt` generated with pip itself from a clean install, so no new tool. Hashes would need pip-tools, a new dev dependency |
+| E6 | Docker image pulls | `mcr.microsoft.com/playwright` (~2 GB) for the Linux baselines, and `postgres` (~150 MB) for one real migration run, the latter only if E1 keeps Postgres. Both in Stage Q |
+| E7 | Data for the edge study | Run the live backend continuously for at least 7 days, on the E1 host or this machine, with live-bar retention raised to 60 days |
+| E8 | Stage order | N → P → Q → R → S |
+
+### 11.5 Delivery log
+
+**Stage N — ship: the repository side (2026-10-01).** The owner approved every recommendation in §11.4, and Stage M. W1's repository side is built and verified locally. Going live needs the cutover at the end of this entry, which only the owner can do.
+
+- **Hosting (E1, E3).** `render.yaml` is now a Blueprint for an always-on `algoviz-backend`:
+  - `plan: 1c-2g` (1 CPU / 2 GB), in Singapore.
+  - A 5 GB disk at `/var/data` holds SQLite (`sqlite+aiosqlite:////var/data/algoviz.db`) and the model store (`/var/data/ml_models`). Render snapshots the disk daily.
+  - Bars are kept for 60 days (E7). Measured at 495 B per bar, that is about 43 MB a day and 2.6 GB over 60 days. That is why the disk is 5 GB rather than the 1 GB first proposed: about $1 a month more. A disk can grow but never shrink.
+  - `ML_TRAIN_THREADS=1`, because `os.cpu_count()` reports the host's cores, not the instance's one CPU.
+  - `CORS_ORIGINS` is set explicitly, to the production frontend only.
+- **Training yields the CPU.**
+  - Spawned training runs and HMM fits now run at POSIX nice +10 (`core/workers.py`). On one CPU, a fit at equal priority would take half the core from the loop that carries the feed.
+  - A test checks the child's niceness on Linux. It is skipped on Windows, which has no `nice()`.
+- **CORS defaults (E2).** Localhost plus `https://algorithmic-viz.vercel.app`. The two third-party origins are gone.
+- **Vercel.**
+  - `frontend/vercel.json` pins the framework (`nextjs`), `npm ci`, `npm run build` and output `.next`, whatever the dashboard still holds from the Vite project.
+  - `next.config.ts` fails a production build (`VERCEL_ENV=production`) unless `NEXT_PUBLIC_API_URL` starts with `https://` and `NEXT_PUBLIC_WS_URL` with `wss://`. Without them the build would ship a site that talks to localhost.
+  - Checked four ways:
+    - no URLs → the build fails;
+    - an `http://` API URL → it fails;
+    - `https` and `wss` URLs → it builds, with the URL inlined;
+    - a preview build → unaffected.
+- **Docs.** The README's deployment section; ADR-7, now "SQLite on a persistent disk; Postgres optional"; `.env.example`; the production setup in CLAUDE.md.
+- **`scripts/smoke_deploy.py`** checks a running deployment from the outside:
+  - the deployed version is this checkout's, and `/health/ready` returns 200;
+  - changes are gated: refused without a token and, with `--with-token` and `$ADMIN_TOKEN`, accepted and deleted again;
+  - CORS and the WebSocket admit the frontend origin and refuse a foreign one.
+  - Against the production configuration it passed 8 of 8 anonymously and 10 of 10 with the token.
+- **Not built.** Storing model artefacts on the registry rows was needed only with Postgres, and E1 chose a disk.
+- **Checks:**
+  - Backend: ruff, ruff format and mypy clean (mypy for both the Windows and the Linux target). pytest: 152 passed and 1 skipped (the POSIX test), coverage 92.31 %. pip-audit clean. OpenAPI unchanged.
+  - Frontend: prettier, tsc, eslint, Vitest 27 and the build pass. npm audit is clean under npm 9 and npm 10.
+  - Playwright: 39 of 39.
+  - **Production-configuration smoke test, 11 of 11.** It ran the Blueprint's environment on this machine, with a scratch folder standing in for `/var/data` and a throwaway admin token:
+    - a fresh database migrated on the "disk", JSON logs, and `/health/ready` returning 200;
+    - anonymous access reports that writes are gated; a change is refused without the token (401, problem+json) and accepted with it;
+    - the CORS preflight and the WebSocket are accepted from `algorithmic-viz.vercel.app` and refused from a third-party origin (400 and 403);
+    - after a restart, the charts resumed from the bars on the disk and the stored model was served without retraining.
+- **Cutover, by the owner, in this order:**
+  1. Approve the commit and the push of this stage to `main`. Nothing live changes yet:
+     - The old Render service fails to deploy it, as it failed before, and keeps serving 2.0.0.
+     - Vercel's production build fails on the new guard until step 3.
+  2. Render: New → Blueprint → this repo. That creates `algoviz-backend` from `render.yaml`, which needs a payment method for the paid instance and disk. Note its URL once `/health/ready` returns 200.
+  3. Vercel, project `algo-viz` → Settings → Environment Variables, Production:
+     - set `NEXT_PUBLIC_API_URL=https://<url>` and `NEXT_PUBLIC_WS_URL=wss://<url>/ws`;
+     - confirm the Root Directory is `frontend`;
+     - then redeploy the latest production deployment.
+  4. I run `scripts/smoke_deploy.py` against the production backend, plus a real-GPU pass on the live site.
+  5. The owner pastes the Blueprint's `ADMIN_TOKEN` into Settings → Access and makes one change, or runs the script with `--with-token`. The token never passes through me.
+  6. Retire the hand-made service (`algoviz-52q2`).
+  7. Close Dependabot PRs #9, #2 and #4 (E4).

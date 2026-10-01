@@ -23,27 +23,34 @@ These rules come from the owner and still apply:
 
 ## Where it stands (2026-10-01)
 
-- **Phase 4 is complete:** stages G, J, K, L, H, M, plus the theme v3 overhaul. **Stage M awaits the owner's review.** If they approve, there is no further planned stage; ask what comes next.
+- **Phase 4 is complete:** stages G, J, K, L, H, M, plus the theme v3 overhaul. Stage M was approved 2026-10-01.
+- **Phase 5** (`docs/implementation-plan.md` §11) was approved 2026-10-01 with every recommendation (E1–E8). The order is N → P → Q → R → S.
+  - **Stage N's repository side is delivered** (§11.5) and awaits review.
+  - The owner's cutover steps are listed at the end of that entry: the push, the Render Blueprint, the Vercel environment variables.
+  - After the cutover, verify with `python backend/scripts/smoke_deploy.py https://<backend>`. Only the owner runs it `--with-token`: the token never passes through Claude.
 - **Git:** the whole rebuild (Phases 3 and 4) is on `main`, pushed 2026-10-01 at the owner's request as a fast-forward. `overhaul/phase-3-4` is the merged branch and can be deleted.
   - **Every push to `main` deploys:** `render.yaml` has `autoDeploy: true`, and Vercel builds from `main`.
-  - CI (`.github/workflows/ci.yml`) runs on pushes to `main` and on pull requests.
-  - The deploy outcome of 2026-10-01 was not verified from here (no Render or Vercel access): ask the owner how it went.
-- **Production checklist** (what the rebuild needs from the hosts):
-  - **Render (backend):**
-    - `ENVIRONMENT=production`, `SECRET_KEY`, and an `ADMIN_TOKEN` of ≥ 32 characters. Without `ADMIN_TOKEN` the app refuses to start, and Render keeps the previous deploy serving.
-    - `TRUSTED_PROXIES` set to Render's private ranges.
-    - A Postgres `DATABASE_URL`, because the disk is ephemeral.
-    - A Blueprint-managed service picks all of these up from `render.yaml`; a hand-made one needs them set in the dashboard.
-  - **Vercel (frontend):**
-    - Framework preset **Next.js**, root directory `frontend`. The old project was Vite, and `frontend/vercel.json` is gone.
-    - `NEXT_PUBLIC_API_URL=https://<backend>` and `NEXT_PUBLIC_WS_URL=wss://<backend>/ws`, set before the build.
-    - The frontend's origin must be in the backend's `CORS_ORIGINS` (the defaults list the old `*.vercel.app` names).
-  - Then paste the `ADMIN_TOKEN` into the frontend's Settings → Access to make changes.
+  - CI (`.github/workflows/ci.yml`) runs on pushes to `main` and on pull requests. CI #1 on `3d542f4` was all green, e2e included.
+  - **The 2026-10-01 deploy did not go live** (checked through the public GitHub API, without `gh`):
+    - Vercel's production deploys of `ba73a7c` and `3d542f4` failed (commit status "Vercel: failure"), and `algorithmic-viz.vercel.app` still serves the old Vite app.
+    - The Render backend (`algoviz-52q2.onrender.com`) still reports version 2.0.0.
+    - The logs need the owner's dashboards (§11.1).
+- **Production setup** (Stage N, decisions E1–E3 in plan §11.4):
+  - **Render (backend):** a Blueprint from `render.yaml`. That means service `algoviz-backend`: 1 CPU / 2 GB, a 5 GB disk at `/var/data` holding SQLite and `ml_models`, 60-day bar retention, training pinned to 1 thread, and generated `SECRET_KEY` and `ADMIN_TOKEN`.
+    - Without an `ADMIN_TOKEN` of ≥ 32 characters, production refuses to start.
+    - The old hand-made service (`algoviz-52q2`, still on 2.0.0) is retired once the Blueprint serves.
+  - **Vercel (frontend):** project `algo-viz`, root directory `frontend`. `frontend/vercel.json` pins the Next.js build.
+    - `NEXT_PUBLIC_API_URL=https://<backend>` and `NEXT_PUBLIC_WS_URL=wss://<backend>/ws` must be set for Production.
+    - A production build without them fails on purpose (`next.config.ts`).
+  - CORS defaults and `render.yaml` allow only `https://algorithmic-viz.vercel.app`; the WebSocket allowlist follows.
+  - Then the owner pastes the `ADMIN_TOKEN` into the frontend's Settings → Access to make changes.
 - **Open items the owner must clear** (they need permission):
   - Linux visual baselines. These need the `mcr.microsoft.com/playwright` Docker image (~2 GB); CI skips the visual spec off Windows meanwhile.
-  - A migration run against a real Postgres (Docker image). The DDL was only verified offline.
+  - A migration run against a real Postgres (Docker image). The DDL was only verified offline. Hosting now uses SQLite (E1), so this matters only if Postgres is adopted later.
   - `gh` CLI auth on this machine was invalid at hand-off: `gh auth login`.
-- **Honest model finding:** on live BTC at a 5 s horizon the calibrated model has ~no edge over the class prior (edge −0.045 … +0.001). Never present it as predictive. Candidate improvements for a future phase: a longer horizon, labels with a floor above spread noise, features that survive regime drift.
+- **Honest model finding:** on live BTC at a 5 s horizon the calibrated model has ~no edge over the class prior (edge −0.045 … +0.0015, through v40). Never present it as predictive.
+  - The evidence is only 3.2 h of live bars (8 sessions over 4 days), and bar retention is 7 days.
+  - §11 (W5) plans a proper study: longer horizons, labels with a floor above spread noise, features that survive regime drift.
 
 ## Running it
 
@@ -86,10 +93,15 @@ These rules come from the owner and still apply:
 - Headless Playwright auto-dismisses `window.confirm`; accept dialogs in probe scripts.
 - Timing on SwiftShader is noise (LCP 3–9 s for the same build). Budget bytes and CLS, and only hang-guard timings. Judge visuals and fps on the real GPU (headless Chromium with `--use-angle=d3d11 --enable-gpu`).
 - Judge microstructure visuals on `backend-live`; the synthetic book slides its levels with the mid.
+- Local npm 9.6 exits 0 on a critical `npm audit` finding at `--audit-level=high`; npm 10 (CI) exits 1. Audit locally with `npx -y npm@10 audit --audit-level=high`.
+- `scripts/export_openapi.py` writes CRLF on Windows, so `openapi.json` shows as modified even when the JSON is identical. Compare with `git diff --ignore-cr-at-eol`.
 
 **Backend and ML**
 - Coverage needs `concurrency = ["thread", "greenlet"]` (SQLAlchemy async runs in greenlets). Without it the API modules read ~60 %.
 - In-process training tests need the `capped_threads` fixture, module-scoped. A session-wide `threadpool_limits` hangs the ML engine test on Windows (vcomp OpenMP is process-wide).
+- Even so, the full suite hung once in `test_ml_engine` on Windows (2026-10-01; 1 of 2 runs, cause not yet found, §11 W3). If a run stalls there, kill it and re-run rather than wait.
+  - `py-spy dump` shows the thread stacks.
+  - For asyncio task stacks, use a scratch pytest plugin that calls `task.print_stack()` on a timer (loaded with `-p`).
 - Training and HMM fits run in spawned processes. On Windows, `Process.start()` blocks while pickling arguments, so start them off the loop.
 - SHAP explainers aren't picklable; they are built on the inference thread one at a time.
 - Model artefacts carry a manifest (feature-schema hash, horizon, labels). Bump `FEATURE_SCHEMA_VERSION` in `ml/features.py` whenever a feature's definition changes.
