@@ -158,6 +158,38 @@ async def test_prediction_runs_off_the_event_loop(tmp_path: Path) -> None:
     assert worst_lag < 0.25, f"loop stalled {worst_lag * 1000:.0f} ms during a 400 ms predict"
 
 
+async def test_a_prediction_cancelled_as_it_completes_stays_cancelled(tmp_path: Path) -> None:
+    # On Python 3.11, wait_for() returns the result when a cancellation races with the inner
+    # awaitable completing (gh-86296). The intelligence loop then swallowed stop()'s cancel and
+    # waited for work forever, and stop() with it. Cancel at each of the first loop turns after
+    # the inference thread answers: every cancel that lands must stick.
+    ml = MLEngine(S, _cfg(tmp_path), async_session, persist=False)
+    ml._bundle = _stub_result(_SlowModel(0.0))
+    job = InferenceJob(0, T0, 100.0, 1.0, np.zeros(N_FEATURES))
+    answered = asyncio.Event()
+
+    async def inference_thread(fn: Any, *args: Any) -> Any:
+        await answered.wait()
+        return fn(*args)
+
+    ml._infer.run = inference_thread  # type: ignore[method-assign]
+    try:
+        for turns in range(6):
+            answered.clear()
+            task = asyncio.create_task(ml.predict(job))
+            await asyncio.sleep(0)  # predict now waits on the inference thread
+            answered.set()
+            for _ in range(turns):
+                await asyncio.sleep(0)
+            if task.cancel():
+                with pytest.raises(asyncio.CancelledError):
+                    await task
+            else:
+                await task  # it finished before the cancel: nothing to swallow
+    finally:
+        ml._infer.shutdown()
+
+
 async def test_training_is_single_flight_through_save_and_install(tmp_path: Path) -> None:
     await init_db()
     calls = 0

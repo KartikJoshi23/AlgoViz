@@ -1,7 +1,7 @@
 """
 Smoke-check a running deployment from the outside.
 
-    python scripts/smoke_deploy.py https://algoviz-backend.onrender.com
+    python scripts/smoke_deploy.py https://<backend>.onrender.com
     ADMIN_TOKEN=... python scripts/smoke_deploy.py <url> --with-token   # also a gated change
 
 Checks what a visitor and the operator depend on: the deployed version is this
@@ -104,7 +104,7 @@ async def smoke(base: str, origin: str, token: str | None) -> Checks:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
-    ap.add_argument("url", help="backend base URL, e.g. https://algoviz-backend.onrender.com")
+    ap.add_argument("url", help="backend base URL, e.g. https://<backend>.onrender.com")
     ap.add_argument(
         "--origin", default="https://algorithmic-viz.vercel.app", help="frontend origin"
     )

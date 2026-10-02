@@ -132,7 +132,10 @@ async def run_isolated(
     try:
         await asyncio.shield(starting)
         send_end.close()  # the child owns the only writer now: EOF if it dies
-        ok, payload = await asyncio.wait_for(asyncio.to_thread(recv_end.recv), timeout_s)
+        # asyncio.timeout(), not wait_for(): on Python 3.11 wait_for swallows a cancellation
+        # that races with the result arriving (gh-86296), and a cancelled fit would install.
+        async with asyncio.timeout(timeout_s):
+            ok, payload = await asyncio.to_thread(recv_end.recv)
     except TimeoutError as exc:
         raise WorkerTimeout(f"{proc.name} exceeded {timeout_s:.0f}s") from exc
     except EOFError as exc:

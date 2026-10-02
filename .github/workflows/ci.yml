@@ -16,6 +16,8 @@ jobs:
   backend:
     name: Backend (ruff · mypy · pytest + coverage · pip-audit)
     runs-on: ubuntu-latest
+    # Every job is bounded: a hang fails in minutes instead of running for six hours.
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: backend
@@ -54,6 +56,7 @@ jobs:
   frontend:
     name: Frontend (prettier · tsc · eslint · vitest · next build · npm audit)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
@@ -79,6 +82,7 @@ jobs:
   e2e:
     name: End-to-end (Playwright · synthetic backend)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     needs: [backend, frontend]
     steps:
       - uses: actions/checkout@v4
@@ -114,6 +118,7 @@ jobs:
   images:
     name: Docker images build
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [backend, frontend]
     steps:
       - uses: actions/checkout@v4

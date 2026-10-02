@@ -1207,3 +1207,22 @@ Stage letters continue from Phase 4, skipping O (as I was skipped).
   5. The owner pastes the Blueprint's `ADMIN_TOKEN` into Settings → Access and makes one change, or runs the script with `--with-token`. The token never passes through me.
   6. Retire the hand-made service (`algoviz-52q2`).
   7. Close Dependabot PRs #9, #2 and #4 (E4).
+- **Pushed** as `ef448e3` (2026-10-01). Vercel's production build failed, as expected before step 3. CI #11 then exposed the hang below.
+
+**Stage N follow-up — the intermittent test hang, root-caused (2026-10-02).** CI #11 on `ef448e3` ran the backend pytest for more than two hours; a normal run takes 3 minutes. It was the same hang seen once in the 2026-10-01 audit, before Stage N existed.
+- **Captured locally.** Looping the full suite with an asyncio task-stack dump caught it in the second run:
+  - The test was at `await engine.stop()`, waiting on the intelligence task.
+  - That task was marked "cancelling", yet it had gone back to `await self._intel_wake.wait()` and was waiting for work forever.
+- **Cause.** On Python 3.11, `asyncio.wait_for` returns the inner result when a cancellation races with the inner awaitable completing (gh-86296; fixed in 3.12).
+  - `MLEngine.predict` wrapped the inference thread in `wait_for`. A `stop()` that landed just as a prediction finished was swallowed, and `stop()` then awaited the loop forever.
+  - The same race can hang a production shutdown, such as a deploy restart.
+  - `ws/hub.py` had already been fixed for this; `predict` and `run_isolated` had not. In `run_isolated`, the race would let a cancelled fit be installed.
+- **Fix.** `async with asyncio.timeout(...)` in `predict` and `run_isolated`.
+- **Test.** It cancels a prediction at each of the first six loop turns after the inference thread answers, and requires every cancel that lands to stick. It failed on the old code ("DID NOT RAISE CancelledError") and passes now.
+- **CI.** Every job has `timeout-minutes` (backend 20, frontend 15, e2e 45, images 30), so a hang fails in minutes instead of running for GitHub's six hours.
+- **Checks.** Eight consecutive full runs with coverage were clean (153 passed, 1 skipped, about 2.3 min each, coverage 92 %); the same suite hung in 2 of 6 runs before the fix. ruff, ruff format and mypy (Windows and Linux targets) clean.
+- **Vercel** (the owner deploys it).
+  - A local `vercel build` (CLI 62.1) with this repo's `vercel.json` runs `npm ci` and the full `next build`. Locally it then stops on a Windows-only symlink permission (EPERM), which Vercel's Linux builders don't hit.
+  - Vercel builds with Node 24.x, because `engines: ">=20.9.0"` overrides the project's Node setting.
+  - A production build fails until both `NEXT_PUBLIC_*` URLs are set, by design.
+- **Render.** `algoviz-backend.onrender.com` belongs to another account, so the Blueprint's service will get a suffixed URL. The script examples now say `<backend>`.

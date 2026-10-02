@@ -99,9 +99,11 @@ These rules come from the owner and still apply:
 **Backend and ML**
 - Coverage needs `concurrency = ["thread", "greenlet"]` (SQLAlchemy async runs in greenlets). Without it the API modules read ~60 %.
 - In-process training tests need the `capped_threads` fixture, module-scoped. A session-wide `threadpool_limits` hangs the ML engine test on Windows (vcomp OpenMP is process-wide).
-- Even so, the full suite hung once in `test_ml_engine` on Windows (2026-10-01; 1 of 2 runs, cause not yet found, §11 W3). If a run stalls there, kill it and re-run rather than wait.
-  - `py-spy dump` shows the thread stacks.
-  - For asyncio task stacks, use a scratch pytest plugin that calls `task.print_stack()` on a timer (loaded with `-p`).
+- **Never use `asyncio.wait_for` (Python 3.11); use `async with asyncio.timeout(...)`.**
+  - On 3.11, `wait_for` swallows a cancellation that races with the inner awaitable completing (gh-86296).
+  - In `MLEngine.predict` this left the intelligence loop alive after `stop()` cancelled it, so `stop()` waited forever. That was the intermittent `test_ml_engine` hang on Windows and on CI #11 (Linux), and a shutdown hang in production.
+  - Fixed 2026-10-02 in `predict` and `run_isolated` (the hub had already been fixed), with a regression test.
+- To diagnose a hang: `py-spy dump` shows thread stacks (idle threads here). The answer came from asyncio *task* stacks, via a scratch pytest plugin that calls `task.print_stack()` on a timer (loaded with `-p`).
 - Training and HMM fits run in spawned processes. On Windows, `Process.start()` blocks while pickling arguments, so start them off the loop.
 - SHAP explainers aren't picklable; they are built on the inference thread one at a time.
 - Model artefacts carry a manifest (feature-schema hash, horizon, labels). Bump `FEATURE_SCHEMA_VERSION` in `ml/features.py` whenever a feature's definition changes.

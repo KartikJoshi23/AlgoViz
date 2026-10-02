@@ -418,9 +418,11 @@ class MLEngine:
         loop = asyncio.get_running_loop()
         t0 = loop.time()
         try:
-            probs = await asyncio.wait_for(
-                self._infer.run(_predict_proba, b.model, job.x), self.cfg.ML_INFER_TIMEOUT_S
-            )
+            # asyncio.timeout(), not wait_for(): on Python 3.11 wait_for swallows a cancellation
+            # that races with the prediction completing (gh-86296), and the intelligence loop
+            # then outlived stop() — which waited for it forever.
+            async with asyncio.timeout(self.cfg.ML_INFER_TIMEOUT_S):
+                probs = await self._infer.run(_predict_proba, b.model, job.x)
         except TimeoutError:
             self.inference_timeouts += 1
             logger.warning(
