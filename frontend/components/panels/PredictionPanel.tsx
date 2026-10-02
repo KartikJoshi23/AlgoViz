@@ -101,7 +101,7 @@ export function PredictionPanel({ className }: { className?: string }) {
           <DriftSpark />
           <span className="num ml-auto truncate">
             {drift && drift.status !== "no_data"
-              ? `hit ${fmtPct(drift.hit_rate, 0)} · edge ${fmtSigned(drift.edge_vs_prior, 3)} · n ${drift.n}`
+              ? `edge ${fmtSigned(drift.edge_vs_prior, 3)} vs prior · n ${drift.n}`
               : drift
                 ? `${drift.n}/${drift.n_required} resolved`
                 : "—"}

@@ -52,7 +52,7 @@ from algoviz.market.events import (
     TradeEvent,
 )
 from algoviz.market.features import FeatureSnapshot, StreamingFeatureEngine
-from algoviz.market.persistence import BarWriter, load_bars
+from algoviz.market.persistence import BarSink, BarWriter, load_bars
 from algoviz.market.regime import RegimeDetector, RegimeState, fit_regime
 from algoviz.market.sources import MarketSource, create_source
 from algoviz.ml.engine import InferenceJob, MLEngine
@@ -87,7 +87,7 @@ class SymbolEngine:
         cfg: Settings,
         source: MarketSource,
         hub: Hub,
-        writer: BarWriter | None,
+        writer: BarSink | None,
         *,
         preload: bool = True,
         intelligence: bool = True,
@@ -109,7 +109,7 @@ class SymbolEngine:
                 self.symbol,
                 cfg,
                 async_session,
-                persist=writer is not None,
+                persist=isinstance(writer, BarWriter),  # a collector keeps bars, not predictions
                 offload=offload,  # None → MLEngine's own process offload with the training timeout
             )
             if intelligence
@@ -129,6 +129,8 @@ class SymbolEngine:
         self._prediction: dict[str, Any] | None = None
         self._profile_band: float | None = None  # EWMA of the adaptive depth-profile band
         self._last_snapshot_req = 0.0
+        # held until done: the loop keeps only a weak reference to a running task
+        self._snapshot_requests: set[asyncio.Task[None]] = set()
         self._regime_fit_task: asyncio.Task[None] | None = None
         self._tasks: list[asyncio.Task[None]] = []
         # Intelligence tier. Real-time feed: latest bar wins (a busy tier skips bars,
@@ -177,7 +179,7 @@ class SymbolEngine:
         logger.info("engine started (%s, source=%s)", self.symbol, self.source.name)
 
     async def stop(self) -> None:
-        pending = [*self._tasks]
+        pending = [*self._tasks, *self._snapshot_requests]
         if self._regime_fit_task is not None:
             pending.append(self._regime_fit_task)
         for t in pending:
@@ -319,7 +321,9 @@ class SymbolEngine:
         self._last_snapshot_req = now
         self.book.mark_syncing()
         if self._loop is not None:
-            self._loop.create_task(self.source.request_snapshot())
+            task = self._loop.create_task(self.source.request_snapshot())
+            self._snapshot_requests.add(task)
+            task.add_done_callback(self._snapshot_requests.discard)
 
     # ── 10 Hz / 5 Hz tier ─────────────────────────────────────────
 
@@ -328,7 +332,10 @@ class SymbolEngine:
         while True:
             try:
                 if self._unsent_trades:
-                    batch, self._unsent_trades = self._unsent_trades[-100:], []
+                    # Every fill: a 100 ms tick on live BTC carries up to ~500 in a burst, and a
+                    # cap of 100 dropped 22.6 % of the tape over 5 minutes. A slow client is the
+                    # hub's to protect (it drops whole trade frames, oldest first).
+                    batch, self._unsent_trades = self._unsent_trades, []
                     self.hub.publish("trades", self.symbol, [self.trade_payload(t) for t in batch])
                 if tick % FEATURES_EVERY_TICKS == 0 and self.hub.has_subscribers(
                     "features", self.symbol
@@ -547,7 +554,7 @@ class SymbolEngine:
             return None
         bids, asks = self.book.top(depth)
         band = self._adaptive_band()
-        pb, pa = self.book.depth_profile(settings.BOOK_PROFILE_BINS, band)
+        pb, pa = self.book.depth_profile(self.cfg.BOOK_PROFILE_BINS, band)
         return {
             "symbol": self.symbol,
             "ts_ms": self.book.last_ts_ms,
@@ -555,7 +562,7 @@ class SymbolEngine:
             "asks": [[p, q] for p, q in asks],
             "profile": {
                 "band_bps": round(band, 3),
-                "bins": settings.BOOK_PROFILE_BINS,
+                "bins": self.cfg.BOOK_PROFILE_BINS,
                 "bids": [round(x, 4) for x in pb],
                 "asks": [round(x, 4) for x in pa],
             },
@@ -572,8 +579,8 @@ class SymbolEngine:
 
     def _adaptive_band(self) -> float:
         """Half-band for the depth profile: where most of the in-band depth sits, smoothed."""
-        reach = self.book.depth_reach(settings.BOOK_PROFILE_REACH, settings.BOOK_PROFILE_BPS)
-        target = min(settings.BOOK_PROFILE_BPS, max(settings.BOOK_PROFILE_MIN_BPS, reach * 1.15))
+        reach = self.book.depth_reach(self.cfg.BOOK_PROFILE_REACH, self.cfg.BOOK_PROFILE_BPS)
+        target = min(self.cfg.BOOK_PROFILE_BPS, max(self.cfg.BOOK_PROFILE_MIN_BPS, reach * 1.15))
         if self._profile_band is None:
             self._profile_band = target
         else:

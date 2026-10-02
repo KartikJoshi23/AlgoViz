@@ -4,7 +4,7 @@
 
 ### Real-time market-microstructure intelligence
 
-L2 order book · order-flow imbalance · regime detection · calibrated next-move probabilities · signals · alerts · event-driven backtests — rendered as a liquidity terrain you can orbit.
+L2 order book · order-flow imbalance · regime detection · calibrated next-move probabilities · signals · alerts · event-driven backtests — rendered live as a price × time liquidity heatmap, with an orbitable 3D terrain on request.
 
 [![CI](https://github.com/KartikJoshi23/AlgoViz/actions/workflows/ci.yml/badge.svg)](https://github.com/KartikJoshi23/AlgoViz/actions/workflows/ci.yml)
 [![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org)
@@ -33,7 +33,11 @@ AlgoViz consumes the Binance trade and diff-depth streams for a symbol, rebuilds
 | **Alerts** | Threshold rules on any catalog feature, evaluated every second, history + acknowledgement, Discord delivery |
 | **Backtests** | Declarative strategies (entries, exits, stops, targets, max hold, cooldown, model probabilities) run event-by-event on real 1-second bars with next-bar fills, slippage and commission |
 
-The frontend is a Next.js app with a WebGL **liquidity terrain** (price × time × cumulative depth, displaced in a vertex shader from the depth ring), trade-flow particles, and a regime-driven ambient field behind glass panels — all of which pause when off-screen and degrade to 2D when WebGL is unavailable.
+The frontend is a Next.js app.
+- **The hero** is a price × time **liquidity heatmap**: resting size per price bin over the last three minutes, with trade bubbles and the mid trail. It is Canvas 2D, the same view on every tier.
+- **On request,** where WebGL exists, the same depth renders as an orbitable **3D terrain**: price × time × cumulative depth, displaced in a vertex shader.
+- **Surfaces:** panels sit on a navy "midnight glass" surface under a slow, regime-tinted aurora; frosted glass is kept for the floating chrome.
+- **Fallbacks:** motion pauses off-screen and follows `prefers-reduced-motion`, and software renderers get a quieter low tier.
 
 Everything runs offline too: a structurally honest **synthetic exchange** (GBM with a sticky volatility chain, Hawkes-style trades, a mean-reverting book with far-liquidity walls) and a **replay** mode for recorded streams drive the same pipeline.
 
@@ -126,9 +130,9 @@ Symbols: `SYMBOLS=["BTCUSDT"]` (allowlist: BTCUSDT, ETHUSDT, SOLUSDT). Synthetic
 
 ⌘/Ctrl-K opens the command palette. Preferences live in `localStorage` and sync across tabs. Motion respects `prefers-reduced-motion`; software renderers get the low tier automatically (2D hero, no glass blur, no looping ambient motion).
 
-### Visual identity — "Depth"
+### Visual identity — "midnight glass"
 
-A navy "midnight glass" theme. Colour carries meaning only: bids teal, asks crimson and the mid gold — the order book's own semantics, checked with colour-vision-deficiency simulation to stay distinguishable. The volatility state is a single violet lightness ramp (calm → extreme), which also tints the slow aurora behind the page. Status colours are reserved for state and always come with a label. All text meets WCAG AA.
+A navy theme. Colour carries meaning only: bids teal, asks crimson and the mid gold — the order book's own semantics, checked with colour-vision-deficiency simulation to stay distinguishable. The volatility state is a single violet lightness ramp (calm → extreme), which also tints the slow aurora behind the page. Status colours are reserved for state and always come with a label. All text meets WCAG AA.
 
 ---
 

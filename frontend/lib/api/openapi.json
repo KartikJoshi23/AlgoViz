@@ -1673,6 +1673,17 @@
             "title": "N Required",
             "type": "integer"
           },
+          "prior_hit_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prior Hit Rate"
+          },
           "prior_log_loss": {
             "anyOf": [
               {

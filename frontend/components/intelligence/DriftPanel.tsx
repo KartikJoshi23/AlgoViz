@@ -54,7 +54,7 @@ export function DriftPanel({ symbol, className }: { symbol: string | null; class
         <>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
             <MetricTile label="Resolved" value={`${s.n} / ${s.n_required}`} hint={`${s.total_resolved} in total`} />
-            <MetricTile label="Hit rate" value={fmtPct(s.hit_rate, 1)} hint="3 classes · chance 33%" />
+            <MetricTile label="Hit rate" value={fmtPct(s.hit_rate, 1)} hint={`prior's own calls ${fmtPct(s.prior_hit_rate, 1)}`} />
             <MetricTile label="Directional hits" value={fmtPct(s.directional_hit_rate, 1)} hint="up / down calls only" />
             <MetricTile label="Log-loss" value={fmt3(s.log_loss)} hint={`class prior ${fmt3(s.prior_log_loss)}`} />
             <MetricTile
@@ -73,9 +73,9 @@ export function DriftPanel({ symbol, className }: { symbol: string | null; class
             <div>
               <div className="col-head mb-1">Rolling hit rate ({WINDOW})</div>
               <MiniSeries
-                label={`Rolling hit rate over ${WINDOW} resolved predictions, against chance`}
+                label={`Rolling hit rate over ${WINDOW} resolved predictions, against always calling the prior's likeliest class`}
                 lines={[{ values: lines.hit, color: COLORS.accent, label: "hit rate", fill: true }]}
-                baseline={{ value: 1 / 3, label: "chance" }}
+                baseline={s.prior_hit_rate != null ? { value: s.prior_hit_rate, label: "class prior" } : undefined}
                 domain={[0, 1]}
                 height={110}
                 format={(v) => fmtPct(v, 0)}

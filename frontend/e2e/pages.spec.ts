@@ -23,7 +23,7 @@ test("preferences persist across reloads and the engine metrics load", async ({ 
   expect(errors()).toEqual([]);
 });
 
-test("book page: terrain, ladder and liquidity", async ({ page }) => {
+test("book page: heatmap, ladder and liquidity", async ({ page }) => {
   await page.goto("/book");
   await expect(panel(page, "Ladder").locator(".row").first()).toBeVisible();
   await expect(panel(page, "Liquidity bands")).toContainText("±10 bps");

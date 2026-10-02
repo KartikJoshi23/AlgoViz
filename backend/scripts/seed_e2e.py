@@ -42,7 +42,7 @@ from algoviz.config import Settings  # noqa: E402
 from algoviz.core.workers import run_in_thread  # noqa: E402
 from algoviz.db import _alembic_config, create_engine_from_settings, run_migrations  # noqa: E402
 from algoviz.market.bars import Bar  # noqa: E402
-from algoviz.market.persistence import bar_to_row  # noqa: E402
+from algoviz.market.persistence import BarCollector, bar_to_row  # noqa: E402
 from algoviz.market.service import SymbolEngine  # noqa: E402
 from algoviz.market.synthetic import SyntheticSource  # noqa: E402
 from algoviz.ml.engine import MLEngine  # noqa: E402
@@ -56,16 +56,6 @@ N_BARS = 1_800
 SEED = 7
 START_MS = 1_790_000_000_000  # fixed, so the template is byte-for-byte the same on every machine
 TEMPLATE = BACKEND / "data" / "e2e-seed"
-
-
-class _Collect:
-    """A bar writer that keeps what it is given (the engine calls `enqueue` per closed bar)."""
-
-    def __init__(self) -> None:
-        self.bars: list[Bar] = []
-
-    def enqueue(self, bar: Bar) -> None:
-        self.bars.append(bar)
 
 
 def _cfg(db: Path, models: Path) -> Settings:
@@ -93,7 +83,7 @@ def _stamp(cfg: Settings) -> dict[str, Any]:
 
 
 async def _history(cfg: Settings) -> list[Bar]:
-    writer = _Collect()
+    writer = BarCollector()
     src = SyntheticSource(SYMBOL, seed=SEED, speed=0, start_ms=START_MS)
     engine = SymbolEngine(
         SYMBOL,

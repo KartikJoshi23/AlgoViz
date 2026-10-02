@@ -32,7 +32,7 @@ from algoviz.config import Settings
 from algoviz.core.time import from_ms, utcnow
 from algoviz.core.workers import run_in_thread
 from algoviz.market.bars import Bar
-from algoviz.market.persistence import iter_bars
+from algoviz.market.persistence import BarCollector, iter_bars
 from algoviz.models import BacktestResult, Prediction
 from algoviz.ws.hub import Hub
 
@@ -51,24 +51,26 @@ def generate_synthetic_bars(symbol: str, n_bars: int, seed: int = 42) -> list[Ba
 
     async def _run() -> list[Bar]:
         src = SyntheticSource(symbol, seed=seed, speed=0, start_ms=1_700_000_000_000)
+        # Every closed bar, not the engine's chart ring (which keeps only the last 600).
+        sink = BarCollector()
         # This already runs in its own thread and loop: HMM fits stay in-process here.
         engine = SymbolEngine(
             symbol,
             global_settings,
             src,
             Hub(),
-            writer=None,
+            writer=sink,
             preload=False,
             intelligence=False,
             offload=run_in_thread,
         )
         await engine.start()
         try:
-            while engine.bars.bars_closed < n_bars:  # noqa: ASYNC110 — polling a counter
+            while len(sink.bars) < n_bars:  # noqa: ASYNC110 — polling a counter
                 await asyncio.sleep(0.02)
         finally:
             await engine.stop()
-        return list(engine.bar_ring)[-n_bars:]
+        return sink.bars[:n_bars]
 
     return asyncio.run(_run())
 

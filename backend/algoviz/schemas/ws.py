@@ -154,6 +154,7 @@ class DriftSummary(BaseModel):
     n_required: int
     total_resolved: int
     hit_rate: float | None = None
+    prior_hit_rate: float | None = None  # always calling the prior's most likely class
     directional_hit_rate: float | None = None
     log_loss: float | None = None
     prior_log_loss: float | None = None

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import math
+from itertools import pairwise
 
 import numpy as np
 import pytest
@@ -11,6 +13,7 @@ from pydantic import ValidationError
 from algoviz.alerts.templates import render, template_error
 from algoviz.backtest.engine import run_backtest
 from algoviz.backtest.metrics import max_drawdown_pct, sharpe_sortino
+from algoviz.backtest.service import generate_synthetic_bars
 from algoviz.backtest.strategy import EXAMPLE_SPECS, StrategySpec
 from algoviz.core.conditions import Cond, Group, parse_condition
 from algoviz.market.bars import Bar
@@ -251,6 +254,17 @@ def test_drift_monitor_statuses() -> None:
     assert len(d2.series(5)) == 5 and d2.series(1)[0]["hit"] is False
 
 
+def test_drift_hit_rate_comes_with_the_priors_own_hit_rate() -> None:
+    # A model that calls "flat" every time is right as often as flat occurs, which is exactly
+    # what calling the prior's majority class scores: a high hit rate alone is no skill.
+    d = DriftMonitor(window=100, min_n=10)
+    d.reset_baseline({"down": 0.1, "flat": 0.8, "up": 0.1}, 0.6, 0.65)
+    for i in range(50):
+        d.record(Outcome(i, (0.1, 0.8, 0.1), 1, 2 if i % 5 == 0 else 1, 0.0))  # 80 % flat
+    s = d.summary()
+    assert s["hit_rate"] == s["prior_hit_rate"] == 0.8
+
+
 # ── Backtest ──────────────────────────────────────────────────────
 
 
@@ -341,6 +355,14 @@ def test_backtest_uses_model_probabilities_when_provided() -> None:
     assert out.metrics["total_trades"] >= 2 and all(t["side"] == "long" for t in out.trades)
     none = run_backtest(bars, spec)  # no probabilities → p_up missing → never enters
     assert none.metrics["total_trades"] == 0
+
+
+async def test_synthetic_history_returns_every_requested_bar() -> None:
+    # The generator used to hand back the engine's 600-bar chart ring, so the default
+    # request for 3,600 bars quietly backtested on 600. Ask for more than the ring holds.
+    bars = await asyncio.to_thread(generate_synthetic_bars, S, 700)
+    assert len(bars) == 700
+    assert all(b.ts_ms - a.ts_ms == 1000 for a, b in pairwise(bars))
 
 
 @pytest.mark.parametrize(

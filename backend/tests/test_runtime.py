@@ -27,7 +27,12 @@ from algoviz.core.workers import InferenceWorker, WorkerError, WorkerTimeout, ru
 from algoviz.db import async_session, init_db
 from algoviz.market.bars import SESSION_GAP_MS, Bar, trailing_segment
 from algoviz.market.book import LocalOrderBook
-from algoviz.market.events import DepthDiffEvent, DepthSnapshotEvent, SourceStatusEvent
+from algoviz.market.events import (
+    DepthDiffEvent,
+    DepthSnapshotEvent,
+    SourceStatusEvent,
+    TradeEvent,
+)
 from algoviz.market.features import StreamingFeatureEngine
 from algoviz.market.persistence import BarWriter
 from algoviz.market.regime import RegimeDetector
@@ -337,6 +342,27 @@ def test_feed_goes_stale_and_recovers(tmp_path: Path) -> None:
     assert published[-1]["status"] == "connected" and engine.stats()["status"] == "connected"
     assert engine.ml is not None
     engine.ml._infer.shutdown()
+
+
+async def test_every_fill_of_a_burst_reaches_the_trades_channel(tmp_path: Path) -> None:
+    # A live BTC burst puts up to ~500 fills in one 100 ms tick; a cap of 100 per tick
+    # silently dropped 22.6 % of the tape over five minutes.
+    hub = Hub()
+    sent: list[dict[str, Any]] = []
+    hub.publish = lambda ch, _sym, data: sent.extend(data) if ch == "trades" else None  # type: ignore[method-assign]
+    engine = SymbolEngine(
+        S, _cfg(tmp_path), SyntheticSource(S), hub, writer=None, intelligence=False
+    )
+    for i in range(500):
+        engine.handle_event(
+            TradeEvent(S, T0 + i, 100.0, 0.01, is_buyer_maker=i % 2 == 0, trade_id=i)
+        )
+    task = asyncio.create_task(engine._broadcast_loop())
+    await asyncio.sleep(0.05)  # the first tick publishes what accumulated
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
+    assert [t["trade_id"] for t in sent] == list(range(500))
 
 
 # ── Book: O(1) per diff, bounded size ─────────────────────────────

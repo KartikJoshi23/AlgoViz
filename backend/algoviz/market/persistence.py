@@ -18,7 +18,7 @@ import contextlib
 import logging
 from collections.abc import AsyncIterator
 from datetime import timedelta
-from typing import Any
+from typing import Any, Protocol
 
 from sqlalchemy import delete, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -109,6 +109,22 @@ def row_to_bar(row: MarketSnapshot) -> Bar:
         trend=row.trend,
         extra=dict(row.extra or {}),
     )
+
+
+class BarSink(Protocol):
+    """Where an engine hands each closed bar: the database writer, or a collector."""
+
+    def enqueue(self, bar: Bar) -> None: ...
+
+
+class BarCollector:
+    """A sink that keeps every closed bar in memory (synthetic history for backtests and the e2e seed)."""
+
+    def __init__(self) -> None:
+        self.bars: list[Bar] = []
+
+    def enqueue(self, bar: Bar) -> None:
+        self.bars.append(bar)
 
 
 class BarWriter:

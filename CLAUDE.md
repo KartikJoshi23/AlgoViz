@@ -25,7 +25,8 @@ These rules come from the owner and still apply:
 
 - **Phase 4 is complete:** stages G, J, K, L, H, M, plus the theme v3 overhaul. Stage M was approved 2026-10-01.
 - **Phase 5** (`docs/implementation-plan.md` §11) was approved 2026-10-01 with every recommendation (E1–E8). The order is N → P → Q → R → S.
-  - **Stage N's repository side is delivered** (§11.5) and awaits review.
+  - **Stage N's repository side is pushed** (`ef448e3`) and awaits the owner's cutover.
+  - The hang fix (`asyncio.timeout`) and **Stage P** (correctness and honesty) are delivered in the working tree and await review and a push.
   - The owner's cutover steps are listed at the end of that entry: the push, the Render Blueprint, the Vercel environment variables.
   - After the cutover, verify with `python backend/scripts/smoke_deploy.py https://<backend>`. Only the owner runs it `--with-token`: the token never passes through Claude.
 - **Git:** the whole rebuild (Phases 3 and 4) is on `main`, pushed 2026-10-01 at the owner's request as a fast-forward. `overhaul/phase-3-4` is the merged branch and can be deleted.
@@ -65,7 +66,7 @@ These rules come from the owner and still apply:
 
 - **Backend** (in `backend/`):
   - `ruff check .`, `ruff format --check .`, `mypy`
-  - `pytest -q --cov` — 152 tests, coverage floor 90 % (92.5 % now)
+  - `pytest -q --cov` — 157 tests (one is POSIX-only, so 156 pass and 1 skips on Windows), coverage floor 90 % (92.45 % now)
   - `pip-audit -r requirements.txt --strict`
   - OpenAPI freshness
 - **Frontend** (in `frontend/`): `npm run format:check`, `npm run check` (tsc · eslint · vitest 27 · next build), `npm audit --audit-level=high`.

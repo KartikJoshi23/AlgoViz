@@ -1254,6 +1254,8 @@ export interface components {
             n: number;
             /** N Required */
             n_required: number;
+            /** Prior Hit Rate */
+            prior_hit_rate?: number | null;
             /** Prior Log Loss */
             prior_log_loss?: number | null;
             /** Realised Class Mix */

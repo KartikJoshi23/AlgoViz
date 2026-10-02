@@ -1000,7 +1000,7 @@ Deviations and limits:
 
 ## 11. Phase 5 — Ship, harden, and test the model for an edge (proposed)
 
-> **Status:** approved 2026-10-01 with every recommendation in §11.4. Stage N's repository side is delivered (§11.5) and awaits review and the owner's cutover. Stages keep §7's review-stop discipline.
+> **Status:** approved 2026-10-01 with every recommendation in §11.4. Stage N's repository side is pushed (`ef448e3`) and awaits the owner's cutover. Its follow-up (the hang fix) and Stage P are delivered in the working tree and await review (§11.5). Stages keep §7's review-stop discipline.
 > **Inputs:** the 2026-10-01 takeover audit:
 > - every gate re-run locally, and CI #1 on `3d542f4`;
 > - the GitHub commit and deployment statuses, and the production URLs;
@@ -1226,3 +1226,33 @@ Stage letters continue from Phase 4, skipping O (as I was skipped).
   - Vercel builds with Node 24.x, because `engines: ">=20.9.0"` overrides the project's Node setting.
   - A production build fails until both `NEXT_PUBLIC_*` URLs are set, by design.
 - **Render.** `algoviz-backend.onrender.com` belongs to another account, so the Blueprint's service will get a suffixed URL. The script examples now say `<backend>`.
+
+**Stage P — correctness and honesty (2026-10-02).** W2, with a test for each finding that fails on the old code and passes now.
+
+- **Synthetic backtest history (finding 8).**
+  - The generator now collects every closed bar through a `BarCollector` sink, instead of reading the engine's 600-bar chart ring.
+  - `BarSink`, a protocol in `market/persistence.py`, types the engine's writer. Only a real `BarWriter` turns on prediction persistence.
+  - `scripts/seed_e2e.py` uses the same collector instead of its own copy. The template is unchanged.
+  - Test: a request for 700 bars returns 700 contiguous bars. The old generator returned 600.
+- **Drift monitor (finding 9).**
+  - The summary now reports `prior_hit_rate`: the hit rate of always calling the prior's most likely class over the same window.
+  - The hit-rate tile and the rolling chart compare against it; "chance 33 %" is gone.
+  - The model card's drift line shows edge vs the prior instead of a bare hit rate.
+  - Contracts regenerated (one field).
+  - Test: a model that always calls "flat" scores exactly the prior's hit rate.
+  - Live, v40: hit rate 54.9 %, prior's own calls 54.9 %, edge −0.215. The old panel showed that as "54.9 % vs chance 33 %".
+- **Trade frames (finding 10).**
+  - Measured first: over 5 minutes of live BTCUSDT, replaying the engine's 100 ms batching, the per-tick cap of 100 would have dropped 5,365 of 23,788 fills (22.6 %). The busiest tick had 492 fills, and 71 ticks went over 100.
+  - Now every fill is sent. The hub already bounds a slow client by dropping whole trade frames, oldest first.
+  - Test: a 500-fill burst arrives whole. Under the old cap only fills 400–499 arrived.
+  - Live, 3 minutes: the engine counted 32,666 fills and a WebSocket client received 32,666, with no gaps in the trade ids. The largest frame held 802 fills.
+- **Engine (finding 16).** `book_payload` and `_adaptive_band` read the engine's own `cfg`. Snapshot-request tasks are held until they finish, and `stop()` cancels them.
+- **Docs (finding 12).** The README's tagline and frontend paragraph now describe the heatmap hero, the opt-in terrain and midnight glass. The visual-identity section is retitled. A stale e2e test name and comment are fixed.
+- **Checks:**
+  - Backend: ruff, ruff format and mypy clean. pytest: 156 passed and 1 skipped, coverage 92.45 %. pip-audit clean. OpenAPI regenerated and fresh.
+  - Frontend: prettier, tsc, eslint, Vitest 27 and the build pass; npm audit clean.
+  - Playwright: 39 of 39, visual baselines unchanged.
+  - Real-GPU captures of the drift panel and the model card on the live feed, with no console errors.
+- **Left for Stage R:**
+  - The model card's drift line still truncates at 1440 px ("n 1…").
+  - The "Resolved 156 / 40" tile reads as a fraction, but it is the window count against the minimum.

@@ -85,6 +85,9 @@ class DriftMonitor:
         ll_prior = self._log_loss(prior, ys)
         edge = ll_prior - ll
         hit = float((preds == ys).mean())
+        # The bar a hit rate has to clear: always calling the prior's most likely class. With
+        # "flat" the usual majority, a high hit rate alone says nothing about skill.
+        prior_hit = float((ys == int(np.argmax(self._prior))).mean())
         # directional hit-rate ignores flats: of the up/down calls, how many were right?
         directional = (preds != 1) & (ys != 1)
         dir_hit = (
@@ -102,6 +105,7 @@ class DriftMonitor:
             "n_required": self.min_n,
             "total_resolved": self.total_resolved,
             "hit_rate": round(hit, 4),
+            "prior_hit_rate": round(prior_hit, 4),
             "directional_hit_rate": round(dir_hit, 4) if dir_hit is not None else None,
             "log_loss": round(ll, 4),
             "prior_log_loss": round(ll_prior, 4),

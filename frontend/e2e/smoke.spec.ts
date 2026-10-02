@@ -37,7 +37,6 @@ test("dashboard streams live data and renders every panel", async ({ page }) => 
 
   // price chart, order book depth curve, tape and model panel
   await expect(page.locator('[aria-label="Price chart"] canvas').first()).toBeVisible();
-  // scoped: on a software renderer the terrain panel shows the same 2D curve as its fallback
   await expect(panel(page, "Order book").locator('canvas[aria-label^="Cumulative depth"]')).toBeVisible();
   await expect(panel(page, "Tape").locator("li").first()).toBeVisible();
   // ready (the barrier probabilities), warming (labelled samples) or before the first prediction frame

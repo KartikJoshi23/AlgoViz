@@ -3,7 +3,23 @@
 Notable changes, newest first. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased] — Phase 4: professional hardening and redesign
+## [Unreleased] — Phase 5: ship, harden, test the model for an edge
+
+### Deployment (Stage N)
+- `render.yaml` is a Blueprint for an always-on backend: 1 CPU / 2 GB, with a 5 GB disk holding SQLite and the trained models. Bars are kept 60 days.
+- `frontend/vercel.json` pins the Next.js build. A production build fails unless the backend URLs are `https://` and `wss://`.
+- The default CORS origins no longer include two third-party sites.
+- Training and HMM fits run at a lower OS priority (POSIX), so on one CPU they can't starve the live feed.
+- `scripts/smoke_deploy.py` checks a running deployment from the outside.
+
+### Fixed
+- An intermittent hang in shutdown and in the test suite. On Python 3.11, `asyncio.wait_for` swallowed a cancellation that raced with a prediction completing. It is replaced by `asyncio.timeout`, and CI jobs now have time limits.
+- Synthetic backtest history was capped at 600 bars whatever `BACKTEST_SYNTHETIC_BARS` said.
+- Trade frames kept only the last 100 fills of each 100 ms tick, which dropped 22.6 % of live BTC fills in a 5-minute sample. Every fill is sent now.
+- The drift monitor compared the live hit rate with uniform chance. It now shows the prior's own hit rate, and the model card shows the edge vs the prior.
+- The engine read the global settings, rather than its own, for the depth profile.
+
+## Phase 4: professional hardening and redesign (on `main` since 2026-10-01)
 
 ### Security and API
 - Mutations need a bearer credential when `MUTATIONS_REQUIRE_AUTH` is on (production by default): the `ADMIN_TOKEN` or a user's JWT. Reads stay public. Production refuses to start without an `ADMIN_TOKEN`, and registration is off there.
