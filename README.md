@@ -76,7 +76,7 @@ Everything runs offline too: a structurally honest **synthetic exchange** (GBM w
 
 ### Prerequisites
 
-Python ≥ 3.11 · Node.js ≥ 20.9 · npm — or Docker.
+Python 3.11 · Node.js 22 · npm — or Docker.
 
 ### One command (Docker)
 
@@ -93,7 +93,7 @@ Frontend → http://localhost:3002 · Backend → http://localhost:8002 (`/docs`
 # backend
 cd backend
 python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
+pip install -e ".[dev]" -c constraints.txt
 uvicorn algoviz.main:app --reload --port 8000        # DATA_SOURCE=synthetic for offline
 ```
 
@@ -184,7 +184,7 @@ With [`just`](https://just.systems): `just setup`, then `just check` runs every 
 # backend gate (what CI runs)
 cd backend && ruff check . && ruff format --check . && mypy
 pytest -q --cov                       # coverage floor 90 % (pyproject.toml); -m "not slow" skips the ML integration test
-pip-audit -r requirements.txt --strict
+pip-audit -r requirements.txt -r constraints.txt --strict
 
 # frontend gate
 cd frontend && npm run format:check && npm run check    # prettier · tsc · eslint · vitest · next build

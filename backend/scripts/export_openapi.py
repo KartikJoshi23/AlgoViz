@@ -26,7 +26,10 @@ def main() -> int:
     out = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_OUT
     spec = create_app().openapi()
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(spec, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    # LF on every platform, as .gitattributes stores it: a CRLF export reads as a change
+    out.write_text(
+        json.dumps(spec, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
+    )
     print(f"wrote {out} ({len(spec['paths'])} paths, {len(spec['components']['schemas'])} schemas)")
     return 0
 

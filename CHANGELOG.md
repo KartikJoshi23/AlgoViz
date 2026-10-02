@@ -12,6 +12,14 @@ Notable changes, newest first. The format follows
 - Training and HMM fits run at a lower OS priority (POSIX), so on one CPU they can't starve the live feed.
 - `scripts/smoke_deploy.py` checks a running deployment from the outside.
 
+### Reliability (Stage Q)
+- An async test that hangs is failed after 5 minutes, with every asyncio task's stack in its report. pytest's `faulthandler_timeout` covers synchronous hangs.
+- `npm start` serves the standalone build exactly as the Docker image does, and e2e runs against it.
+- CI runs current action majors on a pinned `ubuntu-24.04` runner. Dependabot sends each major version as a PR of its own and holds the Docker runtimes (Python 3.11, Node 22).
+- `backend/constraints.txt` pins the transitive Python dependencies for Render, Docker and CI, and pip-audit covers them. `scripts/freeze_constraints.py` regenerates it.
+- Node 22 everywhere (`engines`), including Vercel builds.
+- `threadpoolctl` is declared, the OpenAPI export writes LF, and the Vitest config is native ESM.
+
 ### Fixed
 - An intermittent hang in shutdown and in the test suite. On Python 3.11, `asyncio.wait_for` swallowed a cancellation that raced with a prediction completing. It is replaced by `asyncio.timeout`, and CI jobs now have time limits.
 - Synthetic backtest history was capped at 600 bars whatever `BACKTEST_SYNTHETIC_BARS` said.

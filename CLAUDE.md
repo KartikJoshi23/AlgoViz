@@ -26,7 +26,9 @@ These rules come from the owner and still apply:
 - **Phase 4 is complete:** stages G, J, K, L, H, M, plus the theme v3 overhaul. Stage M was approved 2026-10-01.
 - **Phase 5** (`docs/implementation-plan.md` §11) was approved 2026-10-01 with every recommendation (E1–E8). The order is N → P → Q → R → S.
   - **Stage N's repository side is pushed** (`ef448e3`) and awaits the owner's cutover.
-  - The hang fix (`asyncio.timeout`) and **Stage P** (correctness and honesty) are delivered in the working tree and await review and a push.
+  - The hang fix and **Stage P** are pushed (`bea471a`, `6fe1575`); CI #14 was all green.
+  - **Stage Q** (reliability) is delivered in the working tree and awaits review and a push.
+  - Its last item, the Linux visual baselines, waits on Docker Desktop: its engine didn't start (2026-10-02), and the owner should check its window.
   - The owner's cutover steps are listed at the end of that entry: the push, the Render Blueprint, the Vercel environment variables.
   - After the cutover, verify with `python backend/scripts/smoke_deploy.py https://<backend>`. Only the owner runs it `--with-token`: the token never passes through Claude.
 - **Git:** the whole rebuild (Phases 3 and 4) is on `main`, pushed 2026-10-01 at the owner's request as a fast-forward. `overhaul/phase-3-4` is the merged branch and can be deleted.
@@ -55,10 +57,11 @@ These rules come from the owner and still apply:
 
 ## Running it
 
-- The Python venv lives **outside** the repo: `D:\My_Work\Projects\AlgoViz\.venv` (Python 3.11). Elsewhere: `pip install -e "backend[dev]"`.
+- The Python venv lives **outside** the repo: `D:\My_Work\Projects\AlgoViz\.venv` (Python 3.11). Elsewhere: `pip install -e "backend[dev]" -c backend/constraints.txt`.
 - On this machine, dev servers are launched from `D:\My_Work\Projects\AlgoViz\.claude\launch.json`:
   - `backend-synthetic` and `backend-live` on :8000;
-  - `frontend` (dev) and `frontend-prod` (`next start`) on :3000.
+  - `frontend` (dev) and `frontend-prod` on :3000.
+  - `frontend-prod` runs `npm start`, which is `scripts/start-standalone.mjs`: the standalone `server.js` with its static and public files, as the Docker image serves it. e2e uses the same launcher.
 - Use the preview tools to start servers, never Bash.
 - `justfile` lists every task (`just --list`). `just` isn't installed on the dev machine; the commands inside work by hand.
 
@@ -67,7 +70,7 @@ These rules come from the owner and still apply:
 - **Backend** (in `backend/`):
   - `ruff check .`, `ruff format --check .`, `mypy`
   - `pytest -q --cov` — 157 tests (one is POSIX-only, so 156 pass and 1 skips on Windows), coverage floor 90 % (92.45 % now)
-  - `pip-audit -r requirements.txt --strict`
+  - `pip-audit -r requirements.txt -r constraints.txt --strict`
   - OpenAPI freshness
 - **Frontend** (in `frontend/`): `npm run format:check`, `npm run check` (tsc · eslint · vitest 27 · next build), `npm audit --audit-level=high`.
 - **E2E:** `npx playwright test` — 38 tests, plus the toast-stacking test; about 10–13 min on SwiftShader.
@@ -94,6 +97,7 @@ These rules come from the owner and still apply:
 - Headless Playwright auto-dismisses `window.confirm`; accept dialogs in probe scripts.
 - Timing on SwiftShader is noise (LCP 3–9 s for the same build). Budget bytes and CLS, and only hang-guard timings. Judge visuals and fps on the real GPU (headless Chromium with `--use-angle=d3d11 --enable-gpu`).
 - Judge microstructure visuals on `backend-live`; the synthetic book slides its levels with the mid.
+- Playwright prints a web server's stderr only. To see its stdout (Next's "Ready", the launcher command), run with `DEBUG=pw:webserver`. Outside CI it reuses any server already listening on :3100 or :8010, so stop stray servers before trusting a run.
 - Local npm 9.6 exits 0 on a critical `npm audit` finding at `--audit-level=high`; npm 10 (CI) exits 1. Audit locally with `npx -y npm@10 audit --audit-level=high`.
 - `scripts/export_openapi.py` writes CRLF on Windows, so `openapi.json` shows as modified even when the JSON is identical. Compare with `git diff --ignore-cr-at-eol`.
 

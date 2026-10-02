@@ -12,6 +12,8 @@ Test fixtures
 from __future__ import annotations
 
 import asyncio
+import inspect
+import io
 import os
 import tempfile
 from collections.abc import AsyncIterator, Iterator
@@ -40,6 +42,36 @@ from httpx import ASGITransport, AsyncClient  # noqa: E402
 
 from algoviz.core.workers import default_threads  # noqa: E402
 from algoviz.main import create_app  # noqa: E402
+
+# An async test still running after this long has hung (none takes a minute, even under
+# coverage). It is failed with every asyncio task's stack in its report: in a hang the
+# thread stacks show only idle threads, while the task stacks show the await that never
+# returns. (pytest's faulthandler_timeout covers synchronous hangs.)
+HANG_S = 300.0
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    for item in items:
+        if inspect.iscoroutinefunction(getattr(item, "function", None)):
+            item.fixturenames.append("_hang_guard")  # type: ignore[attr-defined]
+
+
+@pytest.fixture
+async def _hang_guard(request: pytest.FixtureRequest) -> AsyncIterator[None]:
+    loop = asyncio.get_running_loop()
+
+    def expire() -> None:
+        stacks = io.StringIO()
+        for task in asyncio.all_tasks(loop):
+            task.print_stack(file=stacks)
+        request.node.add_report_section("call", "asyncio tasks at the hang", stacks.getvalue())
+        for task in asyncio.all_tasks(loop):
+            if getattr(task.get_coro(), "__name__", None) == request.node.originalname:
+                task.cancel(f"still running after {HANG_S:.0f} s")
+
+    timer = loop.call_later(HANG_S, expire)
+    yield
+    timer.cancel()
 
 
 @pytest.fixture(scope="module")

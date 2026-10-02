@@ -4,12 +4,12 @@
   "private": true,
   "description": "AlgoViz — market-microstructure intelligence UI (Next.js, Three.js, GSAP)",
   "engines": {
-    "node": ">=20.9.0"
+    "node": "22.x"
   },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node scripts/start-standalone.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "types": "openapi-typescript lib/api/openapi.json -o lib/api/schema.d.ts --alphabetize",

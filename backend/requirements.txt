@@ -19,6 +19,7 @@ numpy==2.4.6
 scipy==1.17.1
 scikit-learn==1.9.1
 joblib==1.6.0
+threadpoolctl==3.7.0
 shap==0.51.0
 hmmlearn==0.3.3
 sortedcontainers==2.4.0

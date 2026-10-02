@@ -1000,7 +1000,7 @@ Deviations and limits:
 
 ## 11. Phase 5 — Ship, harden, and test the model for an edge (proposed)
 
-> **Status:** approved 2026-10-01 with every recommendation in §11.4. Stage N's repository side is pushed (`ef448e3`) and awaits the owner's cutover. Its follow-up (the hang fix) and Stage P are delivered in the working tree and await review (§11.5). Stages keep §7's review-stop discipline.
+> **Status:** approved 2026-10-01 with every recommendation in §11.4. Stage N's repository side is pushed (`ef448e3`) and awaits the owner's cutover. The hang fix and Stage P are pushed (`bea471a`, `6fe1575`). Stage Q is delivered in the working tree and awaits review, except for the Linux visual baselines, which wait on Docker Desktop (§11.5). Stages keep §7's review-stop discipline.
 > **Inputs:** the 2026-10-01 takeover audit:
 > - every gate re-run locally, and CI #1 on `3d542f4`;
 > - the GitHub commit and deployment statuses, and the production URLs;
@@ -1256,3 +1256,40 @@ Stage letters continue from Phase 4, skipping O (as I was skipped).
 - **Left for Stage R:**
   - The model card's drift line still truncates at 1440 px ("n 1…").
   - The "Resolved 156 / 40" tile reads as a fraction, but it is the window count against the minimum.
+- **Pushed** as `bea471a` (the hang fix) and `6fe1575` (Stage P) on 2026-10-02. CI #14 was green in all four jobs; the backend ran in 3 minutes on Linux with no hang. Vercel failed, as expected until its environment variables are set.
+
+**Stage Q — reliability (2026-10-02).** W3. The hang it was meant to chase was already root-caused and fixed in the Stage N follow-up; what remains makes CI, the builds and the hosts agree.
+
+- **A hang explains itself.**
+  - `tests/conftest.py` puts a guard on every async test. A test still running after 300 s gets every asyncio task's stack attached to its report, and is then cancelled, so the hang becomes a failure that shows the await that never returned.
+  - `faulthandler_timeout = 600` covers synchronous hangs with thread stacks.
+  - Checked with a throwaway test that awaited forever under a 2 s limit: it failed with "still running after 2 s" and both task stacks in the report.
+- **e2e runs what Docker ships.**
+  - `npm start` is now `scripts/start-standalone.mjs`: the standalone `server.js`, with `.next/static` and `public` copied beside it as the Dockerfile does.
+  - It binds to `0.0.0.0` like the image. Linux shells export `HOSTNAME` as the machine's name, which the server would otherwise bind to.
+  - Playwright and `frontend-prod` use it, and the "next start does not work with output: standalone" warning is gone.
+  - Verified: the page, chunks, CSS, `public/` and security headers are served; Playwright's web-server output shows `node scripts/start-standalone.mjs -p 3100`; e2e 39 of 39.
+- **CI.**
+  - Every action is on its current major: checkout, setup-python and setup-node v7, upload-artifact v7, setup-buildx v4, build-push v7. That ends the Node 20 deprecation warnings. Dependabot's own CI had already validated all but setup-python, which it never proposed because of its default five-PR limit.
+  - The runner is pinned to `ubuntu-24.04` instead of `ubuntu-latest`, which moves to Ubuntu 26 on 2026-10-19.
+- **Dependabot.**
+  - Minor and patch bumps are grouped per ecosystem; each major version gets a PR of its own.
+  - The Docker base images are held at Python 3.11 and Node 22, because CI builds those images but tests on its own runtime.
+- **One set of Python versions everywhere (E5).**
+  - `backend/constraints.txt` pins the 31 transitive runtime packages (numba, llvmlite, pandas, starlette, …). It is generated from a clean virtual environment by `scripts/freeze_constraints.py`; a `just constraints` recipe runs it.
+  - Direct dependencies stay in `requirements.txt` only, so a Dependabot bump needs no second edit.
+  - Render, the Docker image and CI install with `-c constraints.txt`, and pip-audit now covers the transitive set too: clean.
+  - The dev virtual environment was 7 packages behind the pins (numba 0.67 → 0.68, starlette 1.6 → 1.7, …). It was aligned, and every gate re-ran on the pinned set.
+  - Limit: generated on Windows, so `uvloop` (Linux-only) is left to the resolver.
+- **Node 22 everywhere.** `engines` is now `22.x`, matching CI and the Docker image. With `>=20.9.0`, Vercel had chosen Node 24.x.
+- **Hygiene.**
+  - `threadpoolctl` is declared; it is imported directly.
+  - `export_openapi.py` writes LF, so a regeneration no longer shows a diff on Windows.
+  - The Vitest config is native ESM (`vitest.config.mts`, using `import.meta.dirname`), which ends Vite's CommonJS warning.
+- **Not done: Linux visual baselines (E6).**
+  - Docker Desktop was started, but its engine never came up: after more than 5 minutes it still reported 0 CPUs, and `wsl -l -v` hung. That points to a dialog waiting for the owner in the Docker Desktop window.
+  - The baselines and the CI change that needs them land together: the e2e job running in `mcr.microsoft.com/playwright:v1.63.0-noble` (the tag exists; Ubuntu 24.04, as the runner), and the visual spec enabled on Linux. Enabling the spec without the baselines would fail CI.
+- **Checks:**
+  - Backend: ruff, ruff format and mypy clean. pytest: 156 passed and 1 skipped, coverage 92.45 %. pip-audit (direct and transitive) clean. OpenAPI fresh.
+  - Frontend: prettier, tsc, eslint, Vitest 27 and the build pass; npm audit clean.
+  - Playwright: 39 of 39 on the standalone server.

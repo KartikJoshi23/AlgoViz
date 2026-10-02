@@ -1,4 +1,5 @@
-# Weekly dependency updates, grouped so a week's bumps arrive as one PR per ecosystem.
+# Weekly dependency updates. Minor and patch bumps arrive grouped, one PR per ecosystem;
+# a major version gets a PR of its own, so it is reviewed rather than merged with the rest.
 # Every PR runs the full CI gate (tests, pip-audit / npm audit, e2e, image builds).
 version: 2
 updates:
@@ -6,15 +7,25 @@ updates:
     directory: /backend
     schedule: { interval: weekly }
     groups:
-      python: { patterns: ["*"] }
+      python: { patterns: ["*"], update-types: [minor, patch] }
   - package-ecosystem: npm
     directory: /frontend
     schedule: { interval: weekly }
     groups:
-      npm: { patterns: ["*"] }
+      npm: { patterns: ["*"], update-types: [minor, patch] }
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+    groups:
+      actions: { patterns: ["*"], update-types: [minor, patch] }
   - package-ecosystem: docker
     directories: [/backend, /frontend]
     schedule: { interval: weekly }
+    # The runtimes move deliberately, together with CI and the hosts (Python 3.11 on
+    # Render and in CI, Node 22 in CI): CI builds these images but tests on its own runtime,
+    # so a green image build says nothing about a new interpreter.
+    ignore:
+      - dependency-name: python
+        versions: [">=3.12"]
+      - dependency-name: node
+        versions: [">=23"]

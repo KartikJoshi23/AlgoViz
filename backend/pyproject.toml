@@ -38,6 +38,7 @@ dependencies = [
     "scipy==1.17.1",
     "scikit-learn==1.9.1",
     "joblib==1.6.0",
+    "threadpoolctl==3.7.0",  # imported directly: thread caps for inference and training (core/workers.py)
     "shap==0.51.0",
     "hmmlearn==0.3.3",
     "sortedcontainers==2.4.0",
@@ -103,6 +104,9 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
 markers = ["slow: long-running integration tests (run in CI; skip locally with -m 'not slow')"]
+# A test still running after 10 minutes dumps every thread's stack (async tests are failed
+# with their asyncio task stacks sooner; see tests/conftest.py).
+faulthandler_timeout = 600
 filterwarnings = [
     "error::DeprecationWarning:algoviz",
 ]

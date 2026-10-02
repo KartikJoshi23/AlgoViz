@@ -12,7 +12,7 @@ default:
 
 # Install the backend (with dev tools), the frontend and Playwright's Chromium
 setup:
-    {{python}} -m pip install -e "backend[dev]"
+    {{python}} -m pip install -e "backend[dev]" -c backend/constraints.txt
     cd frontend && npm ci && npx playwright install chromium
 
 # Backend on the live Binance feed, reloading on change
@@ -34,7 +34,7 @@ check: check-backend check-frontend
 check-backend:
     cd backend && ruff check . && ruff format --check . && mypy
     cd backend && {{python}} -m pytest -q --cov --cov-report=term
-    cd backend && pip-audit -r requirements.txt --strict
+    cd backend && pip-audit -r requirements.txt -r constraints.txt --strict
     just contracts
     git diff --exit-code --ignore-cr-at-eol -- frontend/lib/api/openapi.json frontend/lib/api/schema.d.ts
 
@@ -54,6 +54,10 @@ baselines:
 contracts:
     cd backend && {{python}} scripts/export_openapi.py
     cd frontend && npm run types
+
+# Re-pin the backend's transitive dependencies (backend/constraints.txt) from a clean install
+constraints:
+    cd backend && {{python}} scripts/freeze_constraints.py
 
 # Format everything (ruff for Python, prettier for the frontend)
 format:
