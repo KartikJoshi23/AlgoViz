@@ -1000,7 +1000,7 @@ Deviations and limits:
 
 ## 11. Phase 5 — Ship, harden, and test the model for an edge (proposed)
 
-> **Status:** approved 2026-10-01 with every recommendation in §11.4. Stage N's repository side is pushed (`ef448e3`) and awaits the owner's cutover. The hang fix and Stages P, Q, R and S are pushed (`bea471a`, `6fe1575`, `91af87b`, `c3b7e9b`, `addf995`), with a security update (`36b1463`); CI #19 was all green. Q's Linux visual baselines wait on Docker Desktop. S's verdict is preliminary until 7 days of live bars exist, and E9 awaits the owner (§11.4, §11.5). Stages keep §7's review-stop discipline.
+> **Status:** approved 2026-10-01 with every recommendation in §11.4. Stage N's repository side is pushed (`ef448e3`) and awaits the owner's cutover. The hang fix and Stages P, Q, R and S are pushed (`bea471a`, `6fe1575`, `91af87b`, `c3b7e9b`, `addf995`), with a security update (`36b1463`); CI #19 was all green. Q's Linux visual baselines wait on Docker Desktop. S's verdict is preliminary until 7 days of live bars exist; a collector runs at logon on this machine, and E9 is approved (§11.4, §11.5). Stages keep §7's review-stop discipline.
 > **Inputs:** the 2026-10-01 takeover audit:
 > - every gate re-run locally, and CI #1 on `3d542f4`;
 > - the GitHub commit and deployment statuses, and the production URLs;
@@ -1119,7 +1119,7 @@ Deviations and limits:
   - Every fold reports its edge, with dispersion.
 - Selection is kept honest:
   - The grid is explored on the earlier ~75 % of the data, and the chosen configuration is scored **once** on the untouched last ~25 %.
-  - Pre-registered rule: adopt it only if its edge over the trailing prior is positive in at least 3 of 4 folds and on the final holdout.
+  - Pre-registered rule: adopt it only if it beats both the class prior and the trailing prior in at least 3 of 4 folds and on the final holdout. As first approved, the rule tested the trailing prior alone; it was amended by E9 on 2026-10-07, before the deciding data existed.
 - Outcome:
   - If adopted: new defaults, a feature-schema bump where features change, a retrain, and UI copy.
   - If not: the finding becomes "no edge at any tested horizon on N days", recorded here, and the UI keeps saying so.
@@ -1155,7 +1155,7 @@ Stage letters continue from Phase 4, skipping O (as I was skipped).
 | E6 | Docker image pulls | `mcr.microsoft.com/playwright` (~2 GB) for the Linux baselines, and `postgres` (~150 MB) for one real migration run, the latter only if E1 keeps Postgres. Both in Stage Q |
 | E7 | Data for the edge study | Run the live backend continuously for at least 7 days, on the E1 host or this machine, with live-bar retention raised to 60 days |
 | E8 | Stage order | N → P → Q → R → S |
-| E9 | The edge rule's baseline (raised in Stage S, 2026-10-03) | Require the edge over **both** priors, the class prior and the trailing prior, in at least 3 folds and on the holdout, and select on the same. As approved, the rule tests only the trailing prior, which at long horizons was the weaker of the two (§11.5, Stage S) |
+| E9 | The edge rule's baseline (raised in Stage S, 2026-10-03; **approved 2026-10-07**) | Require the edge over **both** priors, the class prior and the trailing prior, in at least 3 folds and on the holdout, and select on the same. As approved, the rule tests only the trailing prior, which at long horizons was the weaker of the two (§11.5, Stage S) |
 
 ### 11.5 Delivery log
 
@@ -1430,4 +1430,22 @@ Stage letters continue from Phase 4, skipping O (as I was skipped).
   - `scripts/freeze_constraints.py` leaves out packages a direct dependency already pins exactly (`DETERMINED`, today only `pydantic-core`).
   - The line is removed from `constraints.txt` by hand. Re-running the generator would also move every other transitive pin.
   - Dry-run resolution: `main` still installs `pydantic_core` 2.46.5 through pydantic, and PR #12's other bumps resolve against the fixed constraints. pip-audit is clean.
-- **After the push,** Dependabot should rebase or recreate #12 without the core bump. SQLAlchemy 2.1 is a minor release with behaviour changes, so the PR's own CI run (e2e included) is the check before merging.
+- **After the push** (`7fff831`, CI #20 green), Dependabot closed #12 and opened #13 without the core bump. #13 has 9 updates: SQLAlchemy 2.1.3, FastAPI 0.142.2, uvicorn 0.54.0, websockets 17.2, PyJWT 2.15.1, and others.
+  - CI #21 on #13 was all green, e2e included. SQLAlchemy 2.1 is a minor release with behaviour changes, so that run is the check.
+  - Merging it waits on the owner's word.
+
+**E7 collection and E9 (2026-10-07).** The owner chose a Windows startup task for collection and approved E9.
+
+- **Why a task.** Collectors started as preview servers stopped with their Claude session. The 2026-10-03 one ran a few hours, so by 2026-10-07 there were 0.12 days of bars.
+- **The collector.** `scripts/collect_live.py` is the live backend with production's collection settings: bars kept 60 days, training on one thread, bound to 127.0.0.1:8001.
+  - Under `pythonw` (no console) it sends its output to `data/logs/collector.log`, rotated at 20 MB. Spawned training processes re-import the file and write there too.
+  - It exits if the port is in use: uvicorn starts the app before it binds, so a second instance would otherwise write beside the first for a moment.
+- **The task.** "AlgoViz live collector" runs as the owner's user (not elevated). It starts at logon, plus a repeating trigger every 5 minutes with `MultipleInstances IgnoreNew`, no time limit, and it runs on battery.
+  - Task Scheduler's "restart on failure" did not bring back a killed process (still down after 222 s). The repeating trigger did: back in 59 s. A crash now costs at most 5 minutes of bars.
+  - It is the live database's only writer. The machine-local `backend-live` preview configuration is replaced by `frontend-live`, the dev frontend pointed at :8001. Checked: REST and the WebSocket reach the collector, and the source is live.
+- **E9.** The rule and the selection now use the edge over the **better** of the two priors, fold by fold and on the holdout. The report adds a column for it, and "Folds beating both".
+  - A test builds a configuration that beats the trailing prior but loses to the class prior. The amended rule rejects it; the old one counted 4 of 4 beating folds and would have adopted it.
+- **Preliminary re-run** (`docs/edge-study.md`): 15,824 bars, 0.18 days, 12 sessions.
+  - The development best, 120 s · k 2 · floor 0.5 bps, beat both priors in **4 of 4** folds (+0.048 ± 0.035 nats over the better prior).
+  - On the holdout, the newest quarter and mostly a quiet day, its log-loss was 1.378, against 0.840 for the class prior: worse by 0.54 nats. With 7 days of bars the rule would reject it, at the holdout.
+  - This is the regime drift §11.1 expected, and why the holdout is scored once and kept out of selection.

@@ -59,6 +59,10 @@ contracts:
 constraints:
     cd backend && {{python}} scripts/freeze_constraints.py
 
+# Collect live bars for the edge study: the live backend on :8001, bars kept 60 days
+collect:
+    cd backend && {{python}} scripts/collect_live.py
+
 # Save persisted live bars past retention, then run the edge study on everything saved
 study:
     cd backend && {{python}} scripts/export_bars.py

@@ -15,6 +15,8 @@ Notable changes, newest first. The format follows
 ### Edge study (Stage S)
 - `scripts/ml_study.py` runs the pre-registered edge study. It covers 60 label definitions (horizons of 5–120 s, three barrier widths, four floors) and two feature ablations. Each is scored walk-forward with the served recipe on the earlier 75 % of the bars, and the best one is scored once on the rest. The rule decides only with at least 7 days of bars.
 - `scripts/export_bars.py` saves bars as gzipped NDJSON, so they outlive retention. The study reads the exports and the database together.
+- `scripts/collect_live.py` runs the live backend as a long-lived collector on :8001, with bars kept 60 days and training on one thread. Without a console it logs to a file, so a task started at logon can keep it running.
+- The rule requires beating both the class prior and the trailing prior (E9, 2026-10-07, amended before the deciding data existed). As first written it tested the trailing prior alone, which at long horizons was the weaker baseline.
 - A trailing-prior baseline: the class mix of the labels already resolved at each prediction. It is scored in every walk-forward fold, and shown on the Intelligence page and in the drift monitor. The drift monitor starts it from the labels rebuilt from stored bars, so a restart doesn't score new predictions against a uniform guess. The drift status reads "edge" only when the model beats both the class prior and the trailing prior.
 
 ### Heatmap and read-outs (Stage R)

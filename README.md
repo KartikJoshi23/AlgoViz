@@ -197,7 +197,7 @@ python backend/scripts/export_openapi.py && (cd frontend && npm run types)
 
 The Playwright suite covers smoke and page flows, strategies and alerts, WCAG 2.2 AA (axe), visual baselines (recorded on Windows), performance budgets on the non-3D routes, and a WebGL project forcing the mid tier. Every run starts from the same seeded database and trained model (`backend/scripts/seed_e2e.py`). Hooks: `pip install pre-commit && pre-commit install` runs ruff, prettier and eslint with the project's own pinned versions.
 
-Migrations: `cd backend && alembic upgrade head` (run automatically at startup). Record a stream for replay: `python backend/scripts/record_stream.py --seconds 120`. Save bars past retention: `python backend/scripts/export_bars.py`; then run the edge study on them: `python backend/scripts/ml_study.py --out docs/edge-study.md`.
+Migrations: `cd backend && alembic upgrade head` (run automatically at startup). Record a stream for replay: `python backend/scripts/record_stream.py --seconds 120`. Collect live bars for the edge study with a long-running live backend: `python backend/scripts/collect_live.py` (port 8001, bars kept 60 days; under `pythonw` it logs to `backend/data/logs/collector.log`, so a task started at logon can run it). Save bars past retention: `python backend/scripts/export_bars.py`; then run the edge study on them: `python backend/scripts/ml_study.py --out docs/edge-study.md`.
 
 ### Project structure
 
@@ -212,7 +212,7 @@ backend/
     core/        time, logging, auth, middleware, problems, metrics, workers, looplag, users, conditions
     schemas/     rest, ws                  db/  session, migrations, types  models/
   alembic/  scripts/ (export_openapi, freeze_constraints, record_stream, seed_e2e, smoke_deploy,
-           export_bars, ml_study)  tests/  Dockerfile  pyproject.toml
+           export_bars, ml_study, collect_live)  tests/  Dockerfile  pyproject.toml
 frontend/
   app/           routes (/, /book, /intelligence, /strategies, /alerts, /settings), globals.css (tokens), ds.css (components)
   components/    ds (design system), panels, charts, three (Terrain, shaders), conditions, strategies, alerts, intelligence, ui

@@ -16,13 +16,16 @@ label definitions and two feature ablations:
   sample limit), against the class prior, the trailing prior and the logistic
   baseline.
 - Selection is kept honest. The configuration with the best development edge
-  over the trailing prior is scored once on the untouched later part
+  over the better prior is scored once on the untouched later part
   (`score_split`), and a rule fixed in advance decides.
 
-**Rule (pre-registered).** Adopt a configuration only if its edge over the
-trailing prior is positive in at least 3 development folds and on the holdout,
-and only with at least 7 days of bars (E7). Below that the study reports and
-decides nothing.
+**Rule (pre-registered).** Adopt a configuration only if it beats both priors
+(its edge over the better of the class prior and the trailing prior is
+positive) in at least 3 development folds and on the holdout, and only with at
+least 7 days of bars (E7). Below that the study reports and decides nothing.
+The rule first tested the trailing prior alone; at long horizons that was the
+weaker baseline, so it was amended to both (E9, 2026-10-07), before the data
+that decides existed.
 """
 
 from __future__ import annotations
@@ -150,9 +153,9 @@ class ConfigResult:
 
     @property
     def edges(self) -> list[float]:
-        """Log-loss improvement over the trailing prior, per development fold."""
+        """Log-loss improvement over the better of the two priors, per development fold."""
         return [
-            f.trailing_prior_log_loss - f.log_loss
+            min(f.prior_log_loss, f.trailing_prior_log_loss) - f.log_loss
             for f in self.folds
             if f.trailing_prior_log_loss is not None
         ]
@@ -168,6 +171,18 @@ class ConfigResult:
     @property
     def mean_edge_vs_prior(self) -> float:
         return float(np.mean([f.prior_log_loss - f.log_loss for f in self.folds]))
+
+    @property
+    def mean_edge_vs_trailing(self) -> float:
+        return float(
+            np.mean(
+                [
+                    f.trailing_prior_log_loss - f.log_loss
+                    for f in self.folds
+                    if f.trailing_prior_log_loss is not None
+                ]
+            )
+        )
 
 
 def _design(samples: Samples, spec: LabelSpec, ablation: str) -> tuple[np.ndarray, np.ndarray]:
@@ -221,10 +236,11 @@ def decide(best: ConfigResult, held: FoldMetrics | None, days: float) -> Verdict
         )
     if held is None or held.trailing_prior_log_loss is None:
         return Verdict(False, "no holdout to score; nothing is decided")
-    edge = held.trailing_prior_log_loss - held.log_loss
+    edge = min(held.prior_log_loss, held.trailing_prior_log_loss) - held.log_loss
     summary = (
-        f"{best.spec} ({best.ablation}) beat the trailing prior in {best.beating} of "
-        f"{len(best.folds)} development folds and by {edge:+.4f} nats on the holdout"
+        f"{best.spec} ({best.ablation}) beat both priors in {best.beating} of "
+        f"{len(best.folds)} development folds, and the better prior by {edge:+.4f} nats "
+        "on the holdout"
     )
     if best.beating >= MIN_FOLDS_BEATING and edge > 0:
         return Verdict(True, f"adopt: {summary}")
@@ -286,9 +302,9 @@ def render(report: StudyReport) -> str:
         f"- Data: {s.n_bars:,} bars ({s.days:.2f} days of bars) in {s.sessions} "
         f"session{'s' if s.sessions != 1 else ''}, "
         f"{first} to {last} UTC; {len(s.rows):,} samples with a full lookback.",
-        f"- Rule, fixed in advance: adopt only if the edge over the trailing prior is positive in "
-        f"at least {MIN_FOLDS_BEATING} development folds and on the holdout, with at least "
-        f"{MIN_DAYS:g} days of bars.",
+        f"- Rule, fixed in advance: adopt only if the model beats both the class prior and the "
+        f"trailing prior in at least {MIN_FOLDS_BEATING} development folds and on the holdout, "
+        f"with at least {MIN_DAYS:g} days of bars.",
         f"- **Verdict: {report.verdict.reason}.**",
     ]
     if report.best is not None and report.holdout is not None:
@@ -304,19 +320,22 @@ def render(report: StudyReport) -> str:
     lines += [
         "",
         "Development walk-forward, best first. Edges are log-loss improvements in nats; "
-        "the trailing prior is the class mix of the labels already resolved at each prediction.",
+        "the trailing prior is the class mix of the labels already resolved at each prediction. "
+        "The rule's edge is over the better of the two priors, fold by fold.",
         "",
-        "| Label | Features | Samples | Flat | Edge vs prior | Edge vs trailing prior | Folds beating it |",
-        "|---|---|--:|--:|--:|--:|--:|",
+        "| Label | Features | Samples | Flat | Edge vs prior | Edge vs trailing prior "
+        "| Edge vs the better prior | Folds beating both |",
+        "|---|---|--:|--:|--:|--:|--:|--:|",
     ]
     for r in sorted(report.results, key=lambda r: r.mean_edge, reverse=True):
         if not r.folds:
-            lines.append(f"| {r.spec} | {r.ablation} | {r.n:,} | — | — | too few samples | — |")
+            lines.append(f"| {r.spec} | {r.ablation} | {r.n:,} | — | — | — | too few samples | — |")
             continue
         sd = float(np.std(r.edges))
         lines.append(
             f"| {r.spec} | {r.ablation} | {r.n:,} | {r.flat_share:.0%} | "
-            f"{r.mean_edge_vs_prior:+.4f} | {r.mean_edge:+.4f} ± {sd:.4f} | "
+            f"{r.mean_edge_vs_prior:+.4f} | {r.mean_edge_vs_trailing:+.4f} | "
+            f"{r.mean_edge:+.4f} ± {sd:.4f} | "
             f"{r.beating} of {len(r.folds)} |"
         )
     return "\n".join(lines) + "\n"

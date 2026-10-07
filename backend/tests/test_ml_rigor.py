@@ -437,6 +437,19 @@ def test_the_rule_adopts_a_planted_edge_and_nothing_less() -> None:
     too_soon = decide(planted, held, days=1)  # the same result on a day of bars decides nothing
     assert not too_soon.adopt and too_soon.reason.startswith("preliminary")
 
+    # Beating the trailing prior while losing to the class prior is no edge (E9): the
+    # first rule tested the trailing prior alone and would have adopted this.
+    def lose_to_the_class_prior(f: FoldMetrics) -> FoldMetrics:
+        return dataclasses.replace(f, prior_log_loss=f.log_loss - 0.01)
+
+    weaker = ConfigResult(
+        spec, ALL_FEATURES, len(y), planted.flat_share, [lose_to_the_class_prior(f) for f in folds]
+    )
+    assert all(f.trailing_prior_log_loss > f.log_loss for f in weaker.folds)
+    assert weaker.beating == 0
+    verdict = decide(weaker, lose_to_the_class_prior(held), days=8)
+    assert not verdict.adopt and verdict.reason.startswith("no edge")
+
     shuffled = np.random.RandomState(3).permutation(y)
     folds, _ = walk_forward(X[dev], shuffled[dev], 5)
     noise = ConfigResult(spec, ALL_FEATURES, len(y), float((shuffled == 1).mean()), folds)

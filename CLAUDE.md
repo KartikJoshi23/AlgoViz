@@ -30,10 +30,10 @@ These rules come from the owner and still apply:
   - **Stage Q** (reliability) is pushed (`91af87b`); CI #16 was all green.
   - Its last item, the Linux visual baselines, waits on Docker Desktop. Its engine didn't start on 2026-10-02 or 2026-10-03: the app runs, but the `docker-desktop` WSL distribution stays stopped. The owner should check its window for a prompt.
   - **Stages R and S are pushed** (`c3b7e9b`, `addf995`), with a security update (`36b1463`: sharp 0.35.5, source-map-js 1.2.2, CI audits what ships). CI #19 was all green.
-    - S's verdict is preliminary until 7 days of live bars exist (E7). As of 2026-10-07 there are 0.12 days.
-    - **Collection isn't durable yet.** `backend-live` (60-day retention in the machine-local launch.json) runs only while a Claude session keeps its preview server alive; the 2026-10-03 session's collector stopped when the session ended. The durable options are the Render cutover, or a collector that starts with Windows, which needs the owner's permission.
-    - S raised decision E9 (the rule's baseline, plan §11.4) for the owner.
-  - **Pushed 2026-10-07:** the fix for Dependabot PR #12's failing install (`constraints.txt` no longer pins `pydantic-core`; plan §11.5). Merging #12 itself (SQLAlchemy 2.1) waits on its own green CI and the owner's word.
+    - S's verdict is preliminary until 7 days of live bars exist (E7). On 2026-10-07 there were 0.17 days.
+    - **Collection runs on this machine** from 2026-10-07, through the scheduled task "AlgoViz live collector" (see Running it). Earlier collectors ran as session preview servers and stopped when their session ended, which lost four days.
+    - **E9 is approved (2026-10-07):** the rule requires beating both the class prior and the trailing prior. It was amended before the deciding data existed.
+  - **Pushed 2026-10-07:** the fix for Dependabot PR #12's failing install (`constraints.txt` no longer pins `pydantic-core`; plan §11.5). Dependabot replaced #12 with #13 (9 updates, including SQLAlchemy 2.1.3 and FastAPI 0.142.2), and CI #21 on it was all green. Merging it waits on the owner's word.
   - The owner's cutover steps are listed at the end of that entry: the push, the Render Blueprint, the Vercel environment variables.
   - After the cutover, verify with `python backend/scripts/smoke_deploy.py https://<backend>`. Only the owner runs it `--with-token`: the token never passes through Claude.
 - **Git:** the whole rebuild (Phases 3 and 4) is on `main`, pushed 2026-10-01 at the owner's request as a fast-forward. `overhaul/phase-3-4` is the merged branch and can be deleted.
@@ -67,17 +67,23 @@ These rules come from the owner and still apply:
 
 - The Python venv lives **outside** the repo: `D:\My_Work\Projects\AlgoViz\.venv` (Python 3.11). Elsewhere: `pip install -e "backend[dev]" -c backend/constraints.txt`.
 - On this machine, dev servers are launched from `D:\My_Work\Projects\AlgoViz\.claude\launch.json`:
-  - `backend-synthetic` and `backend-live` on :8000;
+  - `backend-synthetic` on :8000;
+  - `frontend-live` on :3000: the dev frontend pointed at the live collector on :8001;
   - `frontend` (dev) and `frontend-prod` on :3000.
   - `frontend-prod` runs `npm start`, which is `scripts/start-standalone.mjs`: the standalone `server.js` with its static and public files, as the Docker image serves it. e2e uses the same launcher.
 - Use the preview tools to start servers, never Bash.
+- **The live backend is the collector, not a preview server.**
+  - The scheduled task "AlgoViz live collector" runs `backend/scripts/collect_live.py` under `pythonw` on 127.0.0.1:8001. It starts at logon, has a watchdog trigger every 5 minutes, keeps bars for 60 days and trains on one thread.
+  - Its log is `backend/data/logs/collector.log`.
+  - It is the live database's only writer: never start another live backend beside it.
+  - Stop it with `Stop-ScheduledTask -TaskName "AlgoViz live collector"`. Remove it with `Unregister-ScheduledTask -TaskName "AlgoViz live collector"`.
 - `justfile` lists every task (`just --list`). `just` isn't installed on the dev machine; the commands inside work by hand.
 
 ## Gates (what CI runs)
 
 - **Backend** (in `backend/`):
   - `ruff check .`, `ruff format --check .`, `mypy`
-  - `pytest -q --cov` — 167 tests (one is POSIX-only, so 166 pass and 1 skips on Windows), coverage floor 90 % (92.67 % now)
+  - `pytest -q --cov` — 167 tests (one is POSIX-only, so 166 pass and 1 skips on Windows), coverage floor 90 % (92.69 % now)
   - `pip-audit -r requirements.txt -r constraints.txt --strict`
   - OpenAPI freshness
 - **Frontend** (in `frontend/`): `npm run format:check`, `npm run check` (tsc · eslint · vitest 29 · next build), `npm audit --omit=dev --audit-level=high`.
@@ -107,7 +113,7 @@ These rules come from the owner and still apply:
 - The e2e backend retrains about 10 minutes into a run. Requests slow to seconds around then; once, a strategy DELETE got no answer within the spec's 20 s. Check the trace's request timings and rerun before chasing it.
 - The visual spec leaves every REST call unanswered, so it pins panel anatomy, not model data. When training changes what the model records, bump `SEED_VERSION` in `scripts/seed_e2e.py`, because the seed's stamp doesn't see it.
 - Timing on SwiftShader is noise (LCP 3–9 s for the same build). Budget bytes and CLS, and only hang-guard timings. Judge visuals and fps on the real GPU (headless Chromium with `--use-angle=d3d11 --enable-gpu`).
-- Judge microstructure visuals on `backend-live`; the synthetic book slides its levels with the mid.
+- Judge microstructure visuals on the live feed (`frontend-live` against the collector); the synthetic book slides its levels with the mid.
 - Playwright prints a web server's stderr only. To see its stdout (Next's "Ready", the launcher command), run with `DEBUG=pw:webserver`. Outside CI it reuses any server already listening on :3100 or :8010, so stop stray servers before trusting a run.
 - Local npm 9.6 exits 0 on a critical `npm audit` finding at `--audit-level=high`; npm 10 (CI) exits 1. Audit locally with `npx -y npm@10 audit --audit-level=high`.
 
@@ -127,6 +133,11 @@ These rules come from the owner and still apply:
   - Isotonic calibration still fits exact zeros when a class has only a handful of examples. A label definition where a class is about 1 % will show that as huge log-loss.
 - Model artefacts carry a manifest (feature-schema hash, horizon, labels). Bump `FEATURE_SCHEMA_VERSION` in `ml/features.py` whenever a feature's definition changes.
 - The regime is two axes: a volatility state (calm / normal / elevated / extreme) and a trend (down / flat / up). Renaming categorical values needs an Alembic data migration (see `4c1e7b2a9d30`).
+
+**Long-running processes on Windows**
+- Preview servers stop when their Claude session ends, so they can't collect data for days.
+- Task Scheduler's "restart on failure" covers a task that fails to start, not a process that dies while running. A repeating trigger with `MultipleInstances IgnoreNew` works as a watchdog: tested, a killed collector was back in 59 s.
+- uvicorn starts the app (feed, writer, engine) before it binds its port. A second instance that fails to bind still writes for a moment, so `collect_live.py` checks the port first.
 
 **Shell on Windows**
 - Bash tool: an odd number of apostrophes in a command breaks parsing; write such scripts with a file instead.
