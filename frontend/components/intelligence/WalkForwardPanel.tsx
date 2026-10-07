@@ -205,7 +205,7 @@ function Term({ label, value, hint, sign }: { label: string; value: number | und
         {label}
       </dt>
       <dd className="num text-title font-semibold text-ink">{value != null ? value.toFixed(4) : "—"}</dd>
-      <dd className="truncate text-caption text-ink-faint">{hint}</dd>
+      <dd className="text-caption text-ink-faint">{hint}</dd>
     </div>
   );
 }

@@ -56,7 +56,7 @@ export function MetricTile({
         {label}
       </span>
       <span className={`num truncate text-title font-semibold ${tone === "muted" ? "text-ink-muted" : "text-ink"}`}>{value}</span>
-      {hint && <span className="truncate text-caption text-ink-faint">{hint}</span>}
+      {hint && <span className="text-caption text-ink-faint">{hint}</span>}
     </div>
   );
 }

@@ -68,11 +68,16 @@
   }
   .panel-meta {
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     font-size: var(--text-meta);
     color: var(--color-ink-faint);
+  }
+  /* one line where there is room; on a phone the subtitle wraps instead of losing its end */
+  @media (min-width: 640px) {
+    .panel-meta {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
   }
   .panel-actions {
     margin-left: auto;

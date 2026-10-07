@@ -1,7 +1,7 @@
 import { cumulative } from "@/components/charts/Strip";
 import { HeatRing } from "@/lib/store/heat";
 import { aggregatePrints } from "@/lib/tape";
-import type { BookPayload, TradePayload } from "@/lib/ws/types";
+import type { BookPayload, HeatColumn, TradePayload } from "@/lib/ws/types";
 
 const book = (mid: number, bids: number[], asks: number[], ts = 0): BookPayload =>
   ({ mid, ts_ms: ts, profile: { band_bps: 20, bins: bids.length, bids, asks } }) as unknown as BookPayload;
@@ -41,6 +41,27 @@ describe("HeatRing", () => {
     expect(h.flow).toBe(5);
     h.push(book(100, [1], [1])); // an empty column must not shrink the reference
     expect(h.flow).toBe(5);
+  });
+
+  it("backfills each second of server history as five 5 Hz columns, prints in the middle one", () => {
+    const h = new HeatRing(20, 2);
+    const second = (ts: number, mid: number, buy: number): HeatColumn => ({
+      ts_ms: ts,
+      mid,
+      profile: { band_bps: 20, bins: 2, bids: [1, 3], asks: [2, 2] },
+      buy_qty: buy,
+      buy_notional: buy * mid,
+      sell_qty: 0,
+      sell_notional: 0,
+    });
+    h.backfill([second(1000, 100, 2), second(2000, 101, 0)]);
+    expect(h.head).toBe(10);
+    expect(Array.from({ length: 10 }, (_, age) => h.ts[h.slot(9 - age)])).toEqual([200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000]);
+    const s = h.slot(0);
+    expect(Array.from(h.qty.subarray(s * 4, s * 4 + 4))).toEqual([1, 2, 2, 0]); // differenced, as live frames are
+    const bought = Array.from({ length: 10 }, (_, age) => h.buyQty[h.slot(9 - age)]);
+    expect(bought).toEqual([0, 0, 2, 0, 0, 0, 0, 0, 0, 0]);
+    expect(h.mid[h.slot(0)]).toBe(101);
   });
 });
 

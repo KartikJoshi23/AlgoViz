@@ -1,7 +1,9 @@
-import type { BookPayload, TradePayload } from "@/lib/ws/types";
+import type { BookPayload, HeatColumn, TradePayload } from "@/lib/ws/types";
 
 export const HEAT_COLUMNS = 900; // 3 minutes of book frames at 5 Hz
 export const HEAT_BINS_PER_SIDE = 64; // matches the server's BOOK_PROFILE_BINS
+const FRAME_MS = 200; // live book frames arrive at 5 Hz
+const FRAMES_PER_S = 1000 / FRAME_MS;
 
 /**
  * Liquidity-heatmap history.
@@ -43,7 +45,8 @@ export class HeatRing {
     this.sellNotional = new Float64Array(capacity);
   }
 
-  push(book: BookPayload): boolean {
+  /** Writes one column from a book frame (or a history column, which has the same fields). */
+  push(book: Pick<BookPayload, "mid" | "ts_ms" | "profile">): boolean {
     const p = book.profile;
     if (!p || p.bins !== this.perSide || !(book.mid > 0)) return false;
     if (this.head > 0) {
@@ -76,6 +79,26 @@ export class HeatRing {
     this.peak = this.head === 0 ? colMax : this.peak + 0.02 * (colMax - this.peak);
     this.head += 1;
     return true;
+  }
+
+  /**
+   * Seeds the ring from the server's per-second history (oldest first), so the map is whole
+   * the moment a client connects. Columns are drawn one per live 5 Hz frame, so each second
+   * fills five, with that second's prints in the middle one.
+   */
+  backfill(seconds: HeatColumn[]): void {
+    for (const col of seconds) {
+      for (let k = FRAMES_PER_S - 1; k >= 0; k -= 1) {
+        if (!this.push({ ...col, ts_ms: col.ts_ms - k * FRAME_MS })) break;
+        if (k === Math.floor(FRAMES_PER_S / 2)) {
+          const c = (this.head - 1) % this.capacity;
+          this.buyQty[c] = col.buy_qty;
+          this.buyNotional[c] = col.buy_notional;
+          this.sellQty[c] = col.sell_qty;
+          this.sellNotional[c] = col.sell_notional;
+        }
+      }
+    }
   }
 
   /** Adds prints to the newest column (they arrived since its book frame). */

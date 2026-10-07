@@ -1492,6 +1492,25 @@ export interface components {
             /** Ws Clients */
             ws_clients: number;
         };
+        /**
+         * HeatColumn
+         * @description One second of the liquidity heatmap: the depth profile then, and the prints since the last one.
+         */
+        HeatColumn: {
+            /** Buy Notional */
+            buy_notional: number;
+            /** Buy Qty */
+            buy_qty: number;
+            /** Mid */
+            mid: number;
+            profile: components["schemas"]["DepthProfile"];
+            /** Sell Notional */
+            sell_notional: number;
+            /** Sell Qty */
+            sell_qty: number;
+            /** Ts Ms */
+            ts_ms: number;
+        };
         /** HelloMessage */
         HelloMessage: {
             data: components["schemas"]["HelloPayload"];
@@ -2096,6 +2115,11 @@ export interface components {
             bars: components["schemas"]["BarRows"];
             book: components["schemas"]["BookPayload"] | null;
             features: components["schemas"]["FeaturesPayload"];
+            /**
+             * Heat
+             * @default []
+             */
+            heat: components["schemas"]["HeatColumn"][];
             prediction: components["schemas"]["PredictionPayload"] | null;
             regime: components["schemas"]["RegimePayload"];
             /** Signals */

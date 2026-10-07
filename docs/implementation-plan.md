@@ -1000,7 +1000,7 @@ Deviations and limits:
 
 ## 11. Phase 5 — Ship, harden, and test the model for an edge (proposed)
 
-> **Status:** approved 2026-10-01 with every recommendation in §11.4. Stage N's repository side is pushed (`ef448e3`) and awaits the owner's cutover. The hang fix and Stage P are pushed (`bea471a`, `6fe1575`). Stage Q is delivered in the working tree and awaits review, except for the Linux visual baselines, which wait on Docker Desktop (§11.5). Stages keep §7's review-stop discipline.
+> **Status:** approved 2026-10-01 with every recommendation in §11.4. Stage N's repository side is pushed (`ef448e3`) and awaits the owner's cutover. The hang fix, Stage P and Stage Q are pushed (`bea471a`, `6fe1575`, `91af87b`); Q's Linux visual baselines wait on Docker Desktop. Stage R is delivered in the working tree and awaits review. Next is Stage S (§11.5). Stages keep §7's review-stop discipline.
 > **Inputs:** the 2026-10-01 takeover audit:
 > - every gate re-run locally, and CI #1 on `3d542f4`;
 > - the GitHub commit and deployment statuses, and the production URLs;
@@ -1293,3 +1293,29 @@ Stage letters continue from Phase 4, skipping O (as I was skipped).
   - Backend: ruff, ruff format and mypy clean. pytest: 156 passed and 1 skipped, coverage 92.45 %. pip-audit (direct and transitive) clean. OpenAPI fresh.
   - Frontend: prettier, tsc, eslint, Vitest 27 and the build pass; npm audit clean.
   - Playwright: 39 of 39 on the standalone server.
+- **Pushed** as `91af87b` (2026-10-02). CI #16 was green in all four jobs: the new action versions, the constrained installs and image builds, and the Linux e2e on the standalone launcher.
+
+**Stage R — heatmap history and read-outs (2026-10-02).** W4.
+
+- **The hero is whole on first paint.**
+  - The engine records one heatmap column a second, whether or not anyone is subscribed: the adaptive depth profile, the mid, the band, and the buy and sell prints of that second (accumulated in O(1) per fill).
+  - It keeps 180 of them, the client's three-minute window.
+  - **Deviation from §11.2:** the history travels in the WebSocket snapshot, not a REST read on mount. The client clears its heat ring on every snapshot (connect, reconnect, symbol switch), so the snapshot is the one point where a refill can't race the live frames or miss a reconnect.
+  - Measured on live BTC: the snapshot is 276 KB uncompressed (216 KB of it is 180 columns spanning 180 s, before the WebSocket's per-message deflate) and arrives 80 ms after connect.
+  - The client writes each history second as five columns (columns are placed by index at the live 5 Hz), with that second's prints in the middle one and real 200 ms timestamps, then the live column.
+  - A snapshot without `heat`, from a backend deployed earlier, still hydrates: the map then fills in live, as before. Vercel and Render deploy separately, so this ordering can happen.
+- **Read-outs.**
+  - Panel subtitles wrap below 640 px instead of cutting off mid-sentence; wider screens keep the single-line ellipsis, and nothing truncated there.
+  - Tile hints and the feature names in the SHAP and importance lists wrap.
+  - The model card's drift row wraps its text under the sparkline on narrow cards and drops the trailing "n".
+  - "Trade velocity" becomes "Velocity" (the unit says trades/s).
+  - The drift panel's subtitle names the real window ("the latest N resolved", up to 300). It used to say "rolling window of 40", which is the minimum. "Resolved" shows the window count, with the all-time total as its hint.
+- **Checks:**
+  - Backend: ruff, ruff format and mypy clean. pytest: 157 passed and 1 skipped, coverage 92.49 %. pip-audit clean. OpenAPI regenerated and fresh (`HeatColumn`, `SnapshotPayload.heat`).
+    - New test: a synced book and three prints make a column that the snapshot carries; the snapshot validates against its schema; the window is bounded at 180; each column holds only its own second's prints.
+  - Frontend: prettier, tsc, eslint, Vitest 27 → 29 (backfill expansion and placement; hydration from an older backend), build, npm audit.
+  - Playwright: 37 of 39, then the two intended mobile baseline changes (overview and intelligence, where subtitles now wrap) re-recorded. Compared side by side, the subtitles are the only difference. The visual spec then passed 24 of 24 with `--repeat-each=2`. axe was clean on every route.
+  - Real GPU, live feed:
+    - 3 s after loading `/`, the hero shows the full three minutes, and the "history fills in" note is gone. The audit's capture showed about 10 % of the map 12 s after load.
+    - A truncation scan of every route at 1440 and 390 px finds no text cut by an ellipsis. Before, it found the drift hint and long feature names on desktop, and panel subtitles, the model card's drift line and a WalkForward hint on mobile.
+    - No console errors.

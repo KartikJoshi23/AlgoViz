@@ -12,6 +12,10 @@ Notable changes, newest first. The format follows
 - Training and HMM fits run at a lower OS priority (POSIX), so on one CPU they can't starve the live feed.
 - `scripts/smoke_deploy.py` checks a running deployment from the outside.
 
+### Heatmap and read-outs (Stage R)
+- The liquidity heatmap is whole the moment a page loads. The engine keeps the last three minutes (one column a second, whoever is watching), and the WebSocket snapshot carries them. Before, the map filled in over three minutes after every load.
+- Panel subtitles, tile hints and feature names wrap on narrow screens instead of being cut off. The drift panel names its real window, and the model card's drift line fits.
+
 ### Reliability (Stage Q)
 - An async test that hangs is failed after 5 minutes, with every asyncio task's stack in its report. pytest's `faulthandler_timeout` covers synchronous hangs.
 - `npm start` serves the standalone build exactly as the Docker image does, and e2e runs against it.

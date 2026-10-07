@@ -112,9 +112,7 @@ export function ShapPanel({ symbol }: { symbol: string | null }) {
               return (
                 <li key={s.key} className={`row ${ROW} px-2 py-1`}>
                   <span className="min-w-0">
-                    <span className="block truncate text-meta text-ink" title={s.label}>
-                      {s.label}
-                    </span>
+                    <span className="block text-meta text-ink">{s.label}</span>
                     {s.detail && <span className="num block truncate text-caption text-ink-faint">{s.detail}</span>}
                   </span>
                   <span className="relative h-3" aria-hidden>
@@ -205,7 +203,7 @@ export function ImportancePanel({ info }: { info: ModelInfo | undefined }) {
           <ol className="space-y-1" aria-label="Features by importance">
             {rows.entries.map(({ name, v, sd }) => (
               <li key={name} className={`row ${ROW} px-2 py-1`} title={`+${v.toFixed(4)} ± ${sd.toFixed(4)} nats`}>
-                <span className="truncate text-meta text-ink">{featureLabel(name, labels)}</span>
+                <span className="text-meta text-ink">{featureLabel(name, labels)}</span>
                 <span className="relative h-2.5 rounded-[2px] bg-raised" aria-hidden>
                   <span className="absolute inset-y-0 left-0 rounded-[2px] bg-accent" style={{ width: `max(2px, ${pct(v)})` }} />
                   <span

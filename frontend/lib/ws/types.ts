@@ -22,6 +22,7 @@ export type AlertPayload = S["AlertPayload"];
 export type StatusPayload = S["StatusPayload"];
 export type BacktestProgress = S["BacktestProgressPayload"];
 export type DriftSummary = S["DriftSummary"];
+export type HeatColumn = S["HeatColumn"];
 
 export type MessageOf<T extends ServerMessage["type"]> = Extract<ServerMessage, { type: T }>;
 

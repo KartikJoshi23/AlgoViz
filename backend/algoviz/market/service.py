@@ -67,6 +67,7 @@ BOOK_EVERY_TICKS = 2  # 5 Hz
 BOOK_DEPTH = 50
 BAR_RING = 600
 TRADE_RING = 200
+HEAT_HISTORY_S = 180  # one heatmap column a second: the client's three-minute window
 SNAPSHOT_DEBOUNCE_S = 2.0
 INTEL_BACKLOG = 4  # unpaced sources pause once this many closed bars await the intelligence tier
 
@@ -124,6 +125,9 @@ class SymbolEngine:
         self.bar_ring: deque[Bar] = deque(maxlen=BAR_RING)
         self.trade_ring: deque[TradeEvent] = deque(maxlen=TRADE_RING)
         self._unsent_trades: list[TradeEvent] = []
+        # Heatmap history for clients that connect later (the client's own fills in live).
+        self.heat_history: deque[dict[str, Any]] = deque(maxlen=HEAT_HISTORY_S)
+        self._heat_prints = [0.0, 0.0, 0.0, 0.0]  # buy qty, buy notional, sell qty, sell notional
         self._status = SourceStatusEvent(self.symbol, 0, "idle")
         self._last_regime: RegimeState | None = None
         self._prediction: dict[str, Any] | None = None
@@ -278,6 +282,9 @@ class SymbolEngine:
             self.bars.on_trade(ev)
             self.trade_ring.append(ev)
             self._unsent_trades.append(ev)
+            k = 0 if ev.side == "buy" else 2
+            self._heat_prints[k] += ev.qty
+            self._heat_prints[k + 1] += ev.notional
         elif isinstance(ev, DepthDiffEvent):
             self.n_diffs += 1
             if self.book.apply_diff(ev):
@@ -361,6 +368,7 @@ class SymbolEngine:
                 self.features.tick(now)
                 self.bars.flush(now)
                 self._check_feed(time.monotonic())
+                self._record_heat_column(now)
             except Exception:
                 logger.exception("%s bar flush error", self.symbol)
 
@@ -373,6 +381,36 @@ class SymbolEngine:
             if stale:
                 logger.warning("%s feed stale: no market data for %.0fs", self.symbol, idle)
             self.hub.publish("status", self.symbol, self._status_payload())
+
+    def _record_heat_column(self, now_ms: int) -> None:
+        """
+        Once a second, whether or not anyone is watching: the depth profile and the
+        prints since the last column. A client that connects later then draws the
+        last few minutes of the heatmap at once instead of filling it in live.
+        """
+        mid = self.book.mid
+        if not self.book.synced or mid is None:
+            return  # prints keep accumulating into the next column
+        band = self._adaptive_band()
+        pb, pa = self.book.depth_profile(self.cfg.BOOK_PROFILE_BINS, band)
+        bq, bn, sq, sn = self._heat_prints
+        self._heat_prints = [0.0, 0.0, 0.0, 0.0]
+        self.heat_history.append(
+            {
+                "ts_ms": now_ms,
+                "mid": mid,
+                "profile": {
+                    "band_bps": round(band, 3),
+                    "bins": self.cfg.BOOK_PROFILE_BINS,
+                    "bids": [round(x, 4) for x in pb],
+                    "asks": [round(x, 4) for x in pa],
+                },
+                "buy_qty": round(bq, 6),
+                "buy_notional": round(bn, 2),
+                "sell_qty": round(sq, 6),
+                "sell_notional": round(sn, 2),
+            }
+        )
 
     # ── 1 Hz tier (bar close) ─────────────────────────────────────
 
@@ -625,6 +663,7 @@ class SymbolEngine:
             "signals": self.signals.active(self.now_ms()) if self.signals else [],
             "prediction": self._prediction,
             "source_status": self._status_payload(),
+            "heat": list(self.heat_history),
         }
 
     # ── Stats ─────────────────────────────────────────────────────

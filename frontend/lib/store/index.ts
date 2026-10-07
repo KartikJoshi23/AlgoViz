@@ -250,6 +250,9 @@ export const useStore = create<AppState>()(
               bars.clear();
               s.depth.clear();
               s.heat.clear();
+              // the server's last few minutes, so the map starts whole (a backend deployed
+              // before this field existed sends none: the map then fills in live, as before)
+              s.heat.backfill(d.heat ?? []);
               if (d.book) {
                 s.depth.push(d.book);
                 s.heat.push(d.book);

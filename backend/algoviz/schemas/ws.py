@@ -255,6 +255,18 @@ class HelloPayload(BaseModel):
     server_time_ms: int
 
 
+class HeatColumn(BaseModel):
+    """One second of the liquidity heatmap: the depth profile then, and the prints since the last one."""
+
+    ts_ms: int
+    mid: float
+    profile: DepthProfile
+    buy_qty: float
+    buy_notional: float
+    sell_qty: float
+    sell_notional: float
+
+
 class SnapshotPayload(BaseModel):
     symbol: str
     features: FeaturesPayload
@@ -265,6 +277,8 @@ class SnapshotPayload(BaseModel):
     signals: list[ActiveSignalPayload]
     prediction: PredictionPayload | None
     source_status: StatusPayload
+    # the last few minutes of the heatmap, oldest first, so a new client draws it whole
+    heat: list[HeatColumn] = []
 
 
 # ═════════════════════════════════════════════════════════════════════

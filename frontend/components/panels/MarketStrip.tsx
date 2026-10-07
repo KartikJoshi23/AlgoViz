@@ -89,7 +89,7 @@ export function MarketStrip() {
         trend={<Sparkline col="ofi" label="OFI per bar, last 5 minutes" />}
       />
       <Stat
-        label="Trade velocity"
+        label="Velocity"
         value={f?.velocity}
         format={(v) => v.toFixed(1)}
         unit="trades/s"

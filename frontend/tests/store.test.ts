@@ -48,6 +48,7 @@ function snapshot(rows: (number | null)[][]): ServerMessage {
       signals: [],
       prediction: null,
       source_status: { symbol: "BTCUSDT", status: "connected", detail: "", source: "synthetic" },
+      heat: [],
     },
   };
 }
@@ -81,6 +82,14 @@ describe("store.applyFrame", () => {
     expect(useStore.getState().bars.length).toBe(3);
     expect(useStore.getState().bars.latest("close")).toBe(102);
     expect(useStore.getState().barsHead).toBe(3);
+  });
+
+  it("hydrates from a backend that predates heatmap history (frontend and backend deploy separately)", () => {
+    const old = snapshot([row(1000, 100)]);
+    delete (old.data as { heat?: unknown }).heat;
+    useStore.getState().applyFrame(old);
+    expect(useStore.getState().hydrated).toBe(true);
+    expect(useStore.getState().heat.head).toBe(0);
   });
 
   it("raises toasts for alerts and high-priority signal activations", () => {

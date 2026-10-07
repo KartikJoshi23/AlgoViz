@@ -46,14 +46,18 @@ export function DriftPanel({ symbol, className }: { symbol: string | null; class
       className={className}
       icon={Activity}
       title="Drift monitor"
-      subtitle={`live predictions scored against what happened · rolling window of ${s?.n_required ?? "…"} resolved`}
+      subtitle={`live predictions scored against what happened · the latest ${s?.n ?? "…"} resolved`}
       actions={s && <Badge tone={DRIFT_TONE[s.status] ?? "neutral"}>{s.status.replace("_", " ")}</Badge>}
     >
       {!s && <Skeleton className="h-40" />}
       {s && (
         <>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-            <MetricTile label="Resolved" value={`${s.n} / ${s.n_required}`} hint={`${s.total_resolved} in total`} />
+            <MetricTile
+              label="Resolved"
+              value={s.n}
+              hint={s.n < s.n_required ? `metrics from ${s.n_required}` : `${s.total_resolved} in all`}
+            />
             <MetricTile label="Hit rate" value={fmtPct(s.hit_rate, 1)} hint={`prior's own calls ${fmtPct(s.prior_hit_rate, 1)}`} />
             <MetricTile label="Directional hits" value={fmtPct(s.directional_hit_rate, 1)} hint="up / down calls only" />
             <MetricTile label="Log-loss" value={fmt3(s.log_loss)} hint={`class prior ${fmt3(s.prior_log_loss)}`} />
@@ -65,7 +69,7 @@ export function DriftPanel({ symbol, className }: { symbol: string | null; class
             <MetricTile
               label="Mean |move|"
               value={s.mean_abs_move_bps != null ? `${s.mean_abs_move_bps.toFixed(2)} bps` : "—"}
-              hint="at the touch or the horizon"
+              hint="to barrier or horizon"
             />
           </div>
           <Divider className="my-4" />

@@ -2553,6 +2553,49 @@
         "title": "HealthResponse",
         "type": "object"
       },
+      "HeatColumn": {
+        "description": "One second of the liquidity heatmap: the depth profile then, and the prints since the last one.",
+        "properties": {
+          "buy_notional": {
+            "title": "Buy Notional",
+            "type": "number"
+          },
+          "buy_qty": {
+            "title": "Buy Qty",
+            "type": "number"
+          },
+          "mid": {
+            "title": "Mid",
+            "type": "number"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/DepthProfile"
+          },
+          "sell_notional": {
+            "title": "Sell Notional",
+            "type": "number"
+          },
+          "sell_qty": {
+            "title": "Sell Qty",
+            "type": "number"
+          },
+          "ts_ms": {
+            "title": "Ts Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ts_ms",
+          "mid",
+          "profile",
+          "buy_qty",
+          "buy_notional",
+          "sell_qty",
+          "sell_notional"
+        ],
+        "title": "HeatColumn",
+        "type": "object"
+      },
       "HelloMessage": {
         "properties": {
           "data": {
@@ -4195,6 +4238,14 @@
           },
           "features": {
             "$ref": "#/components/schemas/FeaturesPayload"
+          },
+          "heat": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/HeatColumn"
+            },
+            "title": "Heat",
+            "type": "array"
           },
           "prediction": {
             "anyOf": [

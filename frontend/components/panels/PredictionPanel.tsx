@@ -93,15 +93,15 @@ export function PredictionPanel({ className }: { className?: string }) {
       }
       actions={<Badge tone={p?.signal === "long" ? "bid" : p?.signal === "short" ? "ask" : "neutral"}>{p?.signal ?? "flat"}</Badge>}
       footer={
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="flex shrink-0 items-center gap-2">
             Drift
             <Badge tone={DRIFT_TONE[drift?.status ?? "no_data"] ?? "neutral"}>{drift?.status.replace("_", " ") ?? "no data"}</Badge>
           </span>
           <DriftSpark />
-          <span className="num ml-auto truncate">
+          <span className="num ml-auto whitespace-nowrap">
             {drift && drift.status !== "no_data"
-              ? `edge ${fmtSigned(drift.edge_vs_prior, 3)} vs prior · n ${drift.n}`
+              ? `edge ${fmtSigned(drift.edge_vs_prior, 3)} vs prior`
               : drift
                 ? `${drift.n}/${drift.n_required} resolved`
                 : "—"}

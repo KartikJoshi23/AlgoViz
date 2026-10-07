@@ -36,12 +36,13 @@ from algoviz.market.events import (
 from algoviz.market.features import StreamingFeatureEngine
 from algoviz.market.persistence import BarWriter
 from algoviz.market.regime import RegimeDetector
-from algoviz.market.service import SymbolEngine
+from algoviz.market.service import HEAT_HISTORY_S, SymbolEngine
 from algoviz.market.synthetic import SyntheticSource
 from algoviz.ml.engine import InferenceJob, MLEngine, PredictionStore, _LivePrediction
 from algoviz.ml.features import FEATURE_NAMES, LOOKBACK, N_FEATURES
 from algoviz.ml.train import TrainResult
 from algoviz.models import AlertHistory, AlertRule, MarketSnapshot, Prediction, User
+from algoviz.schemas.ws import SnapshotPayload
 from algoviz.ws.hub import Hub
 
 S = "BTCUSDT"
@@ -363,6 +364,28 @@ async def test_every_fill_of_a_burst_reaches_the_trades_channel(tmp_path: Path) 
     with contextlib.suppress(asyncio.CancelledError):
         await task
     assert [t["trade_id"] for t in sent] == list(range(500))
+
+
+def test_heat_history_reaches_a_client_that_connects_later(tmp_path: Path) -> None:
+    # The heatmap used to start empty and fill in over three minutes after every page load:
+    # the engine now keeps a column a second, whoever is watching, and the snapshot carries it.
+    cfg = _cfg(tmp_path)
+    engine = SymbolEngine(S, cfg, SyntheticSource(S), Hub(), writer=None, intelligence=False)
+    engine.book = _book()
+    for i, buy in enumerate([True, True, False]):
+        engine.handle_event(TradeEvent(S, T0 + i, 100.0, 0.5, is_buyer_maker=not buy, trade_id=i))
+    engine._record_heat_column(T0 + 1000)
+    snap = engine.client_snapshot()
+    SnapshotPayload.model_validate(snap)
+    col = snap["heat"][-1]
+    assert col["ts_ms"] == T0 + 1000 and col["mid"] == pytest.approx(100.005)
+    assert (col["buy_qty"], col["sell_qty"]) == (1.0, 0.5)
+    assert len(col["profile"]["bids"]) == cfg.BOOK_PROFILE_BINS and col["profile"]["bids"][-1] > 0
+    for k in range(HEAT_HISTORY_S + 5):  # quiet seconds still make columns; the window is bounded
+        engine._record_heat_column(T0 + 2000 + k * 1000)
+    heat = engine.client_snapshot()["heat"]
+    assert len(heat) == HEAT_HISTORY_S and heat[0]["ts_ms"] < heat[-1]["ts_ms"]
+    assert heat[-1]["buy_qty"] == 0.0  # each column holds only its own second's prints
 
 
 # ── Book: O(1) per diff, bounded size ─────────────────────────────

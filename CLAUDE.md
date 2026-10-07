@@ -27,8 +27,9 @@ These rules come from the owner and still apply:
 - **Phase 5** (`docs/implementation-plan.md` §11) was approved 2026-10-01 with every recommendation (E1–E8). The order is N → P → Q → R → S.
   - **Stage N's repository side is pushed** (`ef448e3`) and awaits the owner's cutover.
   - The hang fix and **Stage P** are pushed (`bea471a`, `6fe1575`); CI #14 was all green.
-  - **Stage Q** (reliability) is delivered in the working tree and awaits review and a push.
+  - **Stage Q** (reliability) is pushed (`91af87b`); CI #16 was all green.
   - Its last item, the Linux visual baselines, waits on Docker Desktop: its engine didn't start (2026-10-02), and the owner should check its window.
+  - **Stage R** (heatmap history, read-outs) is delivered in the working tree and awaits review and a push. **Stage S** (the edge study) is next.
   - The owner's cutover steps are listed at the end of that entry: the push, the Render Blueprint, the Vercel environment variables.
   - After the cutover, verify with `python backend/scripts/smoke_deploy.py https://<backend>`. Only the owner runs it `--with-token`: the token never passes through Claude.
 - **Git:** the whole rebuild (Phases 3 and 4) is on `main`, pushed 2026-10-01 at the owner's request as a fast-forward. `overhaul/phase-3-4` is the merged branch and can be deleted.
@@ -69,10 +70,10 @@ These rules come from the owner and still apply:
 
 - **Backend** (in `backend/`):
   - `ruff check .`, `ruff format --check .`, `mypy`
-  - `pytest -q --cov` — 157 tests (one is POSIX-only, so 156 pass and 1 skips on Windows), coverage floor 90 % (92.45 % now)
+  - `pytest -q --cov` — 158 tests (one is POSIX-only, so 157 pass and 1 skips on Windows), coverage floor 90 % (92.49 % now)
   - `pip-audit -r requirements.txt -r constraints.txt --strict`
   - OpenAPI freshness
-- **Frontend** (in `frontend/`): `npm run format:check`, `npm run check` (tsc · eslint · vitest 27 · next build), `npm audit --audit-level=high`.
+- **Frontend** (in `frontend/`): `npm run format:check`, `npm run check` (tsc · eslint · vitest 29 · next build), `npm audit --audit-level=high`.
 - **E2E:** `npx playwright test` — 38 tests, plus the toast-stacking test; about 10–13 min on SwiftShader.
   - Projects: `chromium` and `webgl-mid`.
   - Specs: smoke, pages, strategies, alerts, axe (WCAG 2.2 AA), visual (Windows baselines), budgets, webgl.
