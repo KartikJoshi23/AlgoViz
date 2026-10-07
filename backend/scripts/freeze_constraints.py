@@ -28,6 +28,10 @@ BACKEND = Path(__file__).resolve().parents[1]
 REQUIREMENTS = BACKEND / "requirements.txt"
 OUT = BACKEND / "constraints.txt"
 TOOLING = {"pip", "setuptools", "wheel"}
+# Pinned exactly by a direct dependency (pydantic pins its core), so a pin here adds
+# nothing and can only clash: Dependabot bumped pydantic-core alone once, and the
+# install failed (PR #12).
+DETERMINED = {"pydantic-core"}
 
 
 def _name(spec: str) -> str:
@@ -48,7 +52,7 @@ def main() -> int:
             [py, "-m", "pip", "freeze", "--all"], check=True, capture_output=True, text=True
         ).stdout.splitlines()
     pins = sorted(
-        (line for line in frozen if _name(line) not in direct | TOOLING),
+        (line for line in frozen if _name(line) not in direct | TOOLING | DETERMINED),
         key=_name,
     )
     header = (

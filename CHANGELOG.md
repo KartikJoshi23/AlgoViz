@@ -34,6 +34,7 @@ Notable changes, newest first. The format follows
 - CI blocks on advisories in what ships (`npm audit --omit=dev`) and reports dev tooling without failing. braces ≤ 3.0.3, reached only through eslint-config-next, has a high advisory and no patched release.
 
 ### Fixed
+- `constraints.txt` no longer pins `pydantic-core`, which pydantic pins exactly. Dependabot had bumped it alone, and the install could not resolve (PR #12).
 - Calibration could serve certainty in a rare class. This happened when a calibration split's training rows lacked one of the window's classes, for example no "up" before the window's last quarter. scikit-learn then calibrated that split model's p(flat) as "down", and the ensemble predicted p(down) = 1 for every row. Split models now answer for every class in the window.
 - An intermittent hang in shutdown and in the test suite. On Python 3.11, `asyncio.wait_for` swallowed a cancellation that raced with a prediction completing. It is replaced by `asyncio.timeout`, and CI jobs now have time limits.
 - Synthetic backtest history was capped at 600 bars whatever `BACKTEST_SYNTHETIC_BARS` said.

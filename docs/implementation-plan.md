@@ -1000,7 +1000,7 @@ Deviations and limits:
 
 ## 11. Phase 5 — Ship, harden, and test the model for an edge (proposed)
 
-> **Status:** approved 2026-10-01 with every recommendation in §11.4. Stage N's repository side is pushed (`ef448e3`) and awaits the owner's cutover. The hang fix, Stage P and Stage Q are pushed (`bea471a`, `6fe1575`, `91af87b`); Q's Linux visual baselines wait on Docker Desktop. Stages R and S are delivered in the working tree and await review. S's tooling is complete, but its verdict is preliminary until 7 days of live bars exist (§11.5). Stages keep §7's review-stop discipline.
+> **Status:** approved 2026-10-01 with every recommendation in §11.4. Stage N's repository side is pushed (`ef448e3`) and awaits the owner's cutover. The hang fix and Stages P, Q, R and S are pushed (`bea471a`, `6fe1575`, `91af87b`, `c3b7e9b`, `addf995`), with a security update (`36b1463`); CI #19 was all green. Q's Linux visual baselines wait on Docker Desktop. S's verdict is preliminary until 7 days of live bars exist, and E9 awaits the owner (§11.4, §11.5). Stages keep §7's review-stop discipline.
 > **Inputs:** the 2026-10-01 takeover audit:
 > - every gate re-run locally, and CI #1 on `3d542f4`;
 > - the GitHub commit and deployment statuses, and the production URLs;
@@ -1422,3 +1422,12 @@ Stage letters continue from Phase 4, skipping O (as I was skipped).
   - Both are lockfile-only updates from `npm audit fix`. The lockfile diff is exactly those packages and sharp's platform binaries.
 - **braces ≤ 3.0.3** has no patched release. It is reached only through `eslint-config-next` → fast-glob → micromatch, at lint time, on the repo's own patterns. npm's only offer is downgrading eslint-config-next to 14.
 - **The owner's decision:** CI blocks on `npm audit --omit=dev --audit-level=high` (what ships, clean) and runs the full audit as a reported, non-blocking step. Make it blocking again once braces is patched.
+
+**Dependabot PR #12 (2026-10-07).** The grouped Python update (SQLAlchemy 2.0.54 → 2.1.1, uvicorn 0.53 → 0.54, PyJWT 2.15.1, …) failed CI at install.
+
+- **Cause.** Dependabot treats `constraints.txt` as a requirements file. It bumped `pydantic_core` to 2.49.0 on its own, while pydantic 2.13.5 pins `pydantic-core==2.46.5` exactly. This is a gap in Stage Q's constraints design (E5).
+- **Fix** (pushed 2026-10-07).
+  - `scripts/freeze_constraints.py` leaves out packages a direct dependency already pins exactly (`DETERMINED`, today only `pydantic-core`).
+  - The line is removed from `constraints.txt` by hand. Re-running the generator would also move every other transitive pin.
+  - Dry-run resolution: `main` still installs `pydantic_core` 2.46.5 through pydantic, and PR #12's other bumps resolve against the fixed constraints. pip-audit is clean.
+- **After the push,** Dependabot should rebase or recreate #12 without the core bump. SQLAlchemy 2.1 is a minor release with behaviour changes, so the PR's own CI run (e2e included) is the check before merging.

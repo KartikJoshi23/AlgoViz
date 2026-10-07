@@ -29,10 +29,11 @@ These rules come from the owner and still apply:
   - The hang fix and **Stage P** are pushed (`bea471a`, `6fe1575`); CI #14 was all green.
   - **Stage Q** (reliability) is pushed (`91af87b`); CI #16 was all green.
   - Its last item, the Linux visual baselines, waits on Docker Desktop. Its engine didn't start on 2026-10-02 or 2026-10-03: the app runs, but the `docker-desktop` WSL distribution stays stopped. The owner should check its window for a prompt.
-  - **Stages R** (heatmap history, read-outs) **and S** (the edge study) are delivered in the working tree and await review and a push.
-    - R's diff alone is saved as a patch in the session scratchpad, so R and S can be committed separately.
-    - S's verdict is preliminary until 7 days of live bars exist (E7). Collection runs on this machine through `backend-live`, now configured with 60-day retention (plan §11.5, Stage S).
+  - **Stages R and S are pushed** (`c3b7e9b`, `addf995`), with a security update (`36b1463`: sharp 0.35.5, source-map-js 1.2.2, CI audits what ships). CI #19 was all green.
+    - S's verdict is preliminary until 7 days of live bars exist (E7). As of 2026-10-07 there are 0.12 days.
+    - **Collection isn't durable yet.** `backend-live` (60-day retention in the machine-local launch.json) runs only while a Claude session keeps its preview server alive; the 2026-10-03 session's collector stopped when the session ended. The durable options are the Render cutover, or a collector that starts with Windows, which needs the owner's permission.
     - S raised decision E9 (the rule's baseline, plan §11.4) for the owner.
+  - **Pushed 2026-10-07:** the fix for Dependabot PR #12's failing install (`constraints.txt` no longer pins `pydantic-core`; plan §11.5). Merging #12 itself (SQLAlchemy 2.1) waits on its own green CI and the owner's word.
   - The owner's cutover steps are listed at the end of that entry: the push, the Render Blueprint, the Vercel environment variables.
   - After the cutover, verify with `python backend/scripts/smoke_deploy.py https://<backend>`. Only the owner runs it `--with-token`: the token never passes through Claude.
 - **Git:** the whole rebuild (Phases 3 and 4) is on `main`, pushed 2026-10-01 at the owner's request as a fast-forward. `overhaul/phase-3-4` is the merged branch and can be deleted.
