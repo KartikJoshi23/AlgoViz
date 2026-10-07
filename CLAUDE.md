@@ -79,7 +79,8 @@ These rules come from the owner and still apply:
   - `pytest -q --cov` — 167 tests (one is POSIX-only, so 166 pass and 1 skips on Windows), coverage floor 90 % (92.67 % now)
   - `pip-audit -r requirements.txt -r constraints.txt --strict`
   - OpenAPI freshness
-- **Frontend** (in `frontend/`): `npm run format:check`, `npm run check` (tsc · eslint · vitest 29 · next build), `npm audit --audit-level=high`.
+- **Frontend** (in `frontend/`): `npm run format:check`, `npm run check` (tsc · eslint · vitest 29 · next build), `npm audit --omit=dev --audit-level=high`.
+  - The full `npm audit --audit-level=high` runs too, reported but not blocking. braces ≤ 3.0.3 (dev only, via eslint-config-next) has a high advisory and no patched release; the owner chose this scope on 2026-10-07. Make it blocking again once braces ships a fix.
 - **E2E:** `npx playwright test` — 38 tests, plus the toast-stacking test; about 10–13 min on SwiftShader.
   - Projects: `chromium` and `webgl-mid`.
   - Specs: smoke, pages, strategies, alerts, axe (WCAG 2.2 AA), visual (Windows baselines), budgets, webgl.

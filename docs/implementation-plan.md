@@ -1412,3 +1412,13 @@ Stage letters continue from Phase 4, skipping O (as I was skipped).
     - After the engine retrained (v29), the dot plot shows the trailing-prior marker beside the class-prior ring. The Trailing column, the legend entry and the fold labels are present, and the sentence reads "…the trailing prior in 4 (mean edge +0.202)…".
     - The drift tile reads "vs trailing prior +0.437 · at training +0.135".
     - At 390 px the document is 390 wide, and the longer hint wraps without truncating.
+
+**Pre-push audit (2026-10-07).** Before pushing R and S, the audits were re-run: four days had passed since Stage S was gated.
+
+- **pip-audit:** clean.
+- **npm audit:** 7 new high advisories.
+  - `sharp` 0.35.4 (through `next`, ships in the image) → 0.35.5, whose libvips 1.3.4 carries the librsvg fix.
+  - `source-map-js` 1.2.1 (postcss, Tailwind, jsdom) → 1.2.2.
+  - Both are lockfile-only updates from `npm audit fix`. The lockfile diff is exactly those packages and sharp's platform binaries.
+- **braces ≤ 3.0.3** has no patched release. It is reached only through `eslint-config-next` → fast-glob → micromatch, at lint time, on the repo's own patterns. npm's only offer is downgrading eslint-config-next to 14.
+- **The owner's decision:** CI blocks on `npm audit --omit=dev --audit-level=high` (what ships, clean) and runs the full audit as a reported, non-blocking step. Make it blocking again once braces is patched.

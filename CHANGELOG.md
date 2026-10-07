@@ -29,6 +29,10 @@ Notable changes, newest first. The format follows
 - Node 22 everywhere (`engines`), including Vercel builds.
 - `threadpoolctl` is declared, the OpenAPI export writes LF, and the Vitest config is native ESM.
 
+### Security
+- `sharp` 0.35.5 (its libvips carries the librsvg fix for CVE-2026-96889) and `source-map-js` 1.2.2, both high advisories published after Stage S was gated.
+- CI blocks on advisories in what ships (`npm audit --omit=dev`) and reports dev tooling without failing. braces ≤ 3.0.3, reached only through eslint-config-next, has a high advisory and no patched release.
+
 ### Fixed
 - Calibration could serve certainty in a rare class. This happened when a calibration split's training rows lacked one of the window's classes, for example no "up" before the window's last quarter. scikit-learn then calibrated that split model's p(flat) as "down", and the ensemble predicted p(down) = 1 for every row. Split models now answer for every class in the window.
 - An intermittent hang in shutdown and in the test suite. On Python 3.11, `asyncio.wait_for` swallowed a cancellation that raced with a prediction completing. It is replaced by `asyncio.timeout`, and CI jobs now have time limits.
