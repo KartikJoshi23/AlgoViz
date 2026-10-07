@@ -219,7 +219,9 @@ class MLEngine:
             self.horizon_s, self.horizon_bars, cfg.ML_BARRIER_K, cfg.ML_MIN_BARRIER_BPS
         )
         self.store = PredictionStore(sf, self.symbol, enabled=persist)
-        self.drift = DriftMonitor(window=cfg.DRIFT_WINDOW, min_n=cfg.DRIFT_MIN_N)
+        self.drift = DriftMonitor(
+            window=cfg.DRIFT_WINDOW, min_n=cfg.DRIFT_MIN_N, lag=self.horizon_bars
+        )
         self._offload: Offload = offload or partial(
             run_isolated, timeout_s=cfg.ML_TRAIN_TIMEOUT_S, threads=cfg.ML_TRAIN_THREADS or None
         )
@@ -278,6 +280,7 @@ class MLEngine:
             # Seconds of feature vectors for a few thousand bars: a thread, not the loop.
             # Nothing else touches this engine until start() returns.
             await asyncio.to_thread(self._rebuild, history)
+            self.drift.prime(self._y)
             logger.info(
                 "%s: rebuilt %d labelled samples from %d persisted bars (%d session%s)",
                 self.symbol,
@@ -573,6 +576,14 @@ class MLEngine:
     @property
     def samples(self) -> int:
         return len(self._X)
+
+    def training_set(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Copies of the labelled samples: features, classes and each sample's bar time (ms)."""
+        return (
+            np.asarray(self._X, dtype=np.float64).reshape(-1, len(FEATURE_NAMES)),
+            np.asarray(self._y, dtype=int),
+            np.asarray(self._sample_ts, dtype=np.int64),
+        )
 
     def last_payload(self) -> dict[str, Any] | None:
         return self._last_payload

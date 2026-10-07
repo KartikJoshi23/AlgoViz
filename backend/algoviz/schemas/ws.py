@@ -159,6 +159,8 @@ class DriftSummary(BaseModel):
     log_loss: float | None = None
     prior_log_loss: float | None = None
     edge_vs_prior: float | None = None
+    trailing_prior_log_loss: float | None = None  # the outcomes resolved before each prediction
+    edge_vs_trailing_prior: float | None = None
     brier: float | None = None
     train_log_loss: float | None = None
     train_prior_log_loss: float | None = None

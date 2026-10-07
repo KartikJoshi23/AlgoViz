@@ -59,6 +59,11 @@ contracts:
 constraints:
     cd backend && {{python}} scripts/freeze_constraints.py
 
+# Save persisted live bars past retention, then run the edge study on everything saved
+study:
+    cd backend && {{python}} scripts/export_bars.py
+    cd backend && {{python}} scripts/ml_study.py --out ../docs/edge-study.md
+
 # Format everything (ruff for Python, prettier for the frontend)
 format:
     cd backend && ruff check --fix . && ruff format .

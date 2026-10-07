@@ -56,6 +56,11 @@ FEATURE_NAMES: tuple[str, ...] = (
     "hour_sin", "hour_cos",
 )  # fmt: skip
 
+# Divided by the symbol's rolling medians (`QuantityScales`): counts, volume, depth, order flow.
+SCALED_FEATURES: tuple[str, ...] = (
+    "velocity", "trades_10", "volume_10", "liquidity_10bps", "book_slope",
+    "ofi_1s", "ofi_5s", "ofi_30s", "ofi_cum_10",
+)  # fmt: skip
 N_FEATURES = len(FEATURE_NAMES)
 FEATURE_SCHEMA = hashlib.sha256(
     f"{FEATURE_SCHEMA_VERSION}:{','.join(FEATURE_NAMES)}".encode()

@@ -12,6 +12,11 @@ Notable changes, newest first. The format follows
 - Training and HMM fits run at a lower OS priority (POSIX), so on one CPU they can't starve the live feed.
 - `scripts/smoke_deploy.py` checks a running deployment from the outside.
 
+### Edge study (Stage S)
+- `scripts/ml_study.py` runs the pre-registered edge study. It covers 60 label definitions (horizons of 5–120 s, three barrier widths, four floors) and two feature ablations. Each is scored walk-forward with the served recipe on the earlier 75 % of the bars, and the best one is scored once on the rest. The rule decides only with at least 7 days of bars.
+- `scripts/export_bars.py` saves bars as gzipped NDJSON, so they outlive retention. The study reads the exports and the database together.
+- A trailing-prior baseline: the class mix of the labels already resolved at each prediction. It is scored in every walk-forward fold, and shown on the Intelligence page and in the drift monitor. The drift monitor starts it from the labels rebuilt from stored bars, so a restart doesn't score new predictions against a uniform guess. The drift status reads "edge" only when the model beats both the class prior and the trailing prior.
+
 ### Heatmap and read-outs (Stage R)
 - The liquidity heatmap is whole the moment a page loads. The engine keeps the last three minutes (one column a second, whoever is watching), and the WebSocket snapshot carries them. Before, the map filled in over three minutes after every load.
 - Panel subtitles, tile hints and feature names wrap on narrow screens instead of being cut off. The drift panel names its real window, and the model card's drift line fits.
@@ -25,6 +30,7 @@ Notable changes, newest first. The format follows
 - `threadpoolctl` is declared, the OpenAPI export writes LF, and the Vitest config is native ESM.
 
 ### Fixed
+- Calibration could serve certainty in a rare class. This happened when a calibration split's training rows lacked one of the window's classes, for example no "up" before the window's last quarter. scikit-learn then calibrated that split model's p(flat) as "down", and the ensemble predicted p(down) = 1 for every row. Split models now answer for every class in the window.
 - An intermittent hang in shutdown and in the test suite. On Python 3.11, `asyncio.wait_for` swallowed a cancellation that raced with a prediction completing. It is replaced by `asyncio.timeout`, and CI jobs now have time limits.
 - Synthetic backtest history was capped at 600 bars whatever `BACKTEST_SYNTHETIC_BARS` said.
 - Trade frames kept only the last 100 fills of each 100 ms tick, which dropped 22.6 % of live BTC fills in a 5-minute sample. Every fill is sent now.

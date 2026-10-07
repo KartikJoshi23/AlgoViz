@@ -12,7 +12,8 @@ database and model store with a fresh copy of it, so runs never inherit each
 other's rows and the Intelligence page has a model from the first second.
 
 The template is rebuilt when this script's `SEED_VERSION`, the migration head
-or the model manifest changes.
+or the model manifest changes. The manifest doesn't cover what training
+records (fold metrics, baselines), so a change there bumps `SEED_VERSION`.
 """
 
 from __future__ import annotations
@@ -50,7 +51,7 @@ from algoviz.ml.registry import model_manifest  # noqa: E402
 from algoviz.models import MarketSnapshot  # noqa: E402
 from algoviz.ws.hub import Hub  # noqa: E402
 
-SEED_VERSION = 1
+SEED_VERSION = 2  # bump when training changes what the seeded model records (2: trailing prior)
 SYMBOL = "BTCUSDT"
 N_BARS = 1_800
 SEED = 7

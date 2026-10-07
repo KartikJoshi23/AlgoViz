@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import dataclasses
 import json
 import math
 import sqlite3
@@ -14,11 +16,15 @@ from sklearn.ensemble import HistGradientBoostingClassifier
 
 from alembic import command
 from algoviz.backtest.engine import bar_context, run_backtest
+from algoviz.backtest.service import generate_synthetic_bars
 from algoviz.backtest.strategy import StrategySpec
+from algoviz.config import Settings
 from algoviz.core.time import utcnow
-from algoviz.db import _alembic_config
+from algoviz.db import _alembic_config, async_session
 from algoviz.market.bars import Bar
+from algoviz.market.persistence import read_bar_exports, write_bar_export
 from algoviz.market.regime import RegimeDetector, TrendTracker, hac_t_stat
+from algoviz.ml.engine import MLEngine
 from algoviz.ml.evaluation import brier_decomposition, pool_curves, reliability_curve
 from algoviz.ml.explain import Explainer
 from algoviz.ml.features import (
@@ -30,7 +36,30 @@ from algoviz.ml.features import (
     feature_vector,
 )
 from algoviz.ml.registry import ModelRegistry, model_manifest
-from algoviz.ml.train import ES_TAIL, TailStoppedHGB, TrainResult, base_estimators, train
+from algoviz.ml.study import (
+    ABLATE_TOP,
+    ABLATIONS,
+    ALL_FEATURES,
+    MIN_FOLDS_BEATING,
+    ConfigResult,
+    LabelSpec,
+    build_samples,
+    decide,
+    render,
+    run_study,
+)
+from algoviz.ml.train import (
+    ES_TAIL,
+    FoldMetrics,
+    TailStoppedHGB,
+    TrainResult,
+    base_estimators,
+    fit_model,
+    score_split,
+    trailing_prior_proba,
+    train,
+    walk_forward,
+)
 
 S = "BTCUSDT"
 
@@ -103,6 +132,21 @@ def test_early_stopping_validates_on_the_time_ordered_tail(monkeypatch: pytest.M
     assert seen["val_rows"].min() == 1000 - n_val and seen["val_rows"].max() == 999
     # every fit row precedes the tail by at least the embargo: no interleaving, no overlap
     assert seen["fit_rows"].max() == 1000 - n_val - 5 - 1
+
+
+def test_calibration_survives_a_class_missing_from_its_split_models() -> None:
+    # "up" occurs only in the last calibration fold, so every split model is fitted on two
+    # classes. scikit-learn used to calibrate each one's p(flat) as "down" and fill only that
+    # column: the served ensemble said p(down) = 1 for every row.
+    rng = np.random.RandomState(0)
+    X = rng.normal(size=(900, 4))
+    y = np.where(rng.rand(900) < 0.03, 0, 1)
+    y[-100::20] = 2
+    model, method = fit_model(X, y, gap=5)
+    assert method == "sigmoid" and list(model.classes_) == [0, 1, 2]
+    p = model.predict_proba(X)
+    assert abs(p[:, 1].mean() - (y == 1).mean()) < 0.05
+    assert p[:, 0].mean() < 0.1 and p[:, 2].mean() < 0.05
 
 
 def test_folds_are_scored_calibrated_with_reliability_and_brier_terms(
@@ -349,3 +393,109 @@ def test_regime_split_migration_rewrites_stored_labels_and_strategies(tmp_path: 
     assert stored["exit"]["not"]["v"] == "calm"
     assert "trend" in [r[1] for r in con.execute("pragma table_info(market_snapshots)")]
     con.close()
+
+
+# ── Edge study (Stage S) ──────────────────────────────────────────
+
+
+def test_the_trailing_prior_knows_only_labels_resolved_by_each_prediction() -> None:
+    y = np.array([0, 0, 2, 2, 2, 1])
+    p = trailing_prior_proba(y, np.array([0, 3, 5]), horizon_bars=2, window=2)
+    assert np.allclose(
+        p,
+        [
+            [1 / 3, 1 / 3, 1 / 3],  # nothing has resolved two bars before row 0
+            [3 / 5, 1 / 5, 1 / 5],  # rows 0–1 resolved: down, down
+            [1 / 5, 1 / 5, 3 / 5],  # rows 0–3 resolved, the window keeps the last two: up, up
+        ],
+    )
+
+
+def test_folds_score_the_trailing_prior_and_older_artefacts_still_load(
+    trained: tuple[TrainResult, np.ndarray],
+) -> None:
+    r, _ = trained
+    assert all(f.trailing_prior_log_loss is not None for f in r.folds)
+    assert "edge_vs_trailing_prior" in r.oos
+    saved = r.folds[0].as_dict()
+    del saved["trailing_prior_log_loss"]  # an artefact trained before the baseline existed
+    old = FoldMetrics.from_dict(saved)
+    assert old.trailing_prior_log_loss is None
+    assert "edge_vs_trailing_prior" not in dataclasses.replace(r, folds=[old]).oos
+
+
+def test_the_rule_adopts_a_planted_edge_and_nothing_less() -> None:
+    X, y = _dataset(3000)
+    spec = LabelSpec(5, 1.0, 0.5)
+    dev, test = np.arange(2250), np.arange(2255, 3000)
+
+    folds, _ = walk_forward(X[dev], y[dev], 5)
+    planted = ConfigResult(spec, ALL_FEATURES, len(y), float((y == 1).mean()), folds)
+    held, _ = score_split(X, y, dev, test, 5)
+    assert planted.beating == len(folds) >= MIN_FOLDS_BEATING
+    assert decide(planted, held, days=8).adopt
+    too_soon = decide(planted, held, days=1)  # the same result on a day of bars decides nothing
+    assert not too_soon.adopt and too_soon.reason.startswith("preliminary")
+
+    shuffled = np.random.RandomState(3).permutation(y)
+    folds, _ = walk_forward(X[dev], shuffled[dev], 5)
+    noise = ConfigResult(spec, ALL_FEATURES, len(y), float((shuffled == 1).mean()), folds)
+    held, _ = score_split(X, shuffled, dev, test, 5)
+    verdict = decide(noise, held, days=8)
+    assert not verdict.adopt and verdict.reason.startswith("no edge")
+
+
+@pytest.fixture(scope="module")
+def synthetic_bars() -> list[Bar]:
+    return generate_synthetic_bars(S, 1200)
+
+
+async def test_the_study_labels_exactly_as_the_engine_does(
+    tmp_path: Path, synthetic_bars: list[Bar]
+) -> None:
+    bars = [dataclasses.replace(b) for b in synthetic_bars]
+    for b in bars[600:]:
+        b.ts_ms += 60_000  # a gap: no label may reach across it
+    cfg = Settings(_env_file=None, ML_MODEL_DIR=tmp_path)  # type: ignore[call-arg]
+    samples = build_samples(bars, cfg)
+    assert samples.sessions == 2
+
+    ml = MLEngine(S, cfg, async_session, persist=False)
+    for b in bars:
+        ml.ingest_bar(b, live=False)
+    _, y_engine, _ = ml.training_set()
+    served = LabelSpec(cfg.ML_HORIZON_S, cfg.ML_BARRIER_K, cfg.ML_MIN_BARRIER_BPS)
+    keep, y = samples.labels(served)
+    assert keep.all() and np.array_equal(y, y_engine)
+    longer, _ = samples.labels(LabelSpec(60, 1.0, 0.5))
+    assert longer.sum() == keep.sum() - 2 * (60 - served.horizon_s)  # each session's last minute
+
+
+async def test_the_study_scores_each_configuration_and_reports_without_deciding(
+    tmp_path: Path, synthetic_bars: list[Bar]
+) -> None:
+    cfg = Settings(_env_file=None, ML_MODEL_DIR=tmp_path)  # type: ignore[call-arg]
+    specs = [LabelSpec(5, 1.0, 0.5), LabelSpec(30, 1.0, 1.0)]
+    report = await asyncio.to_thread(run_study, synthetic_bars, cfg, specs=specs)
+
+    scored = [r for r in report.results if r.folds]
+    ablated = min(ABLATE_TOP, sum(r.ablation == ALL_FEATURES for r in scored))
+    assert ablated == len(specs)  # both label definitions are scored, so both are ablated
+    assert len(report.results) == len(specs) + ablated * (len(ABLATIONS) - 1)
+    assert report.best is not None and report.best.mean_edge == max(r.mean_edge for r in scored)
+    assert report.holdout is not None and report.holdout.trailing_prior_log_loss is not None
+    assert not report.verdict.adopt and report.verdict.reason.startswith("preliminary")
+    text = render(report)
+    assert text.count("\n| ") == len(report.results) + 1  # the header and a row each
+    assert "UTC" in text and "Holdout (" in text
+
+
+def test_bar_exports_round_trip_and_overlap_without_duplicates(tmp_path: Path) -> None:
+    bars = [
+        Bar(S, 1_700_000_000_000 + i * 1000, "live", 100.0, 100.1, 99.9, 100.0 + i, 100.0, 2.0,
+            1.0, 7, volatility_bps=2.5, regime="calm", extra={"ofi_5s": 0.25})
+        for i in range(10)
+    ]  # fmt: skip
+    write_bar_export(bars[:6], tmp_path / "a.ndjson.gz")
+    write_bar_export(bars[4:], tmp_path / "b.ndjson.gz")
+    assert read_bar_exports([tmp_path / "b.ndjson.gz", tmp_path / "a.ndjson.gz"]) == bars

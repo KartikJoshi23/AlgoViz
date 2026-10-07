@@ -1000,7 +1000,7 @@ Deviations and limits:
 
 ## 11. Phase 5 — Ship, harden, and test the model for an edge (proposed)
 
-> **Status:** approved 2026-10-01 with every recommendation in §11.4. Stage N's repository side is pushed (`ef448e3`) and awaits the owner's cutover. The hang fix, Stage P and Stage Q are pushed (`bea471a`, `6fe1575`, `91af87b`); Q's Linux visual baselines wait on Docker Desktop. Stage R is delivered in the working tree and awaits review. Next is Stage S (§11.5). Stages keep §7's review-stop discipline.
+> **Status:** approved 2026-10-01 with every recommendation in §11.4. Stage N's repository side is pushed (`ef448e3`) and awaits the owner's cutover. The hang fix, Stage P and Stage Q are pushed (`bea471a`, `6fe1575`, `91af87b`); Q's Linux visual baselines wait on Docker Desktop. Stages R and S are delivered in the working tree and await review. S's tooling is complete, but its verdict is preliminary until 7 days of live bars exist (§11.5). Stages keep §7's review-stop discipline.
 > **Inputs:** the 2026-10-01 takeover audit:
 > - every gate re-run locally, and CI #1 on `3d542f4`;
 > - the GitHub commit and deployment statuses, and the production URLs;
@@ -1155,6 +1155,7 @@ Stage letters continue from Phase 4, skipping O (as I was skipped).
 | E6 | Docker image pulls | `mcr.microsoft.com/playwright` (~2 GB) for the Linux baselines, and `postgres` (~150 MB) for one real migration run, the latter only if E1 keeps Postgres. Both in Stage Q |
 | E7 | Data for the edge study | Run the live backend continuously for at least 7 days, on the E1 host or this machine, with live-bar retention raised to 60 days |
 | E8 | Stage order | N → P → Q → R → S |
+| E9 | The edge rule's baseline (raised in Stage S, 2026-10-03) | Require the edge over **both** priors, the class prior and the trailing prior, in at least 3 folds and on the holdout, and select on the same. As approved, the rule tests only the trailing prior, which at long horizons was the weaker of the two (§11.5, Stage S) |
 
 ### 11.5 Delivery log
 
@@ -1319,3 +1320,95 @@ Stage letters continue from Phase 4, skipping O (as I was skipped).
     - 3 s after loading `/`, the hero shows the full three minutes, and the "history fills in" note is gone. The audit's capture showed about 10 % of the map 12 s after load.
     - A truncation scan of every route at 1440 and 390 px finds no text cut by an ellipsis. Before, it found the drift hint and long feature names on desktop, and panel subtitles, the model card's drift line and a WalkForward hint on mobile.
     - No console errors.
+
+**Stage S — the edge study (2026-10-03).** W5. The study is built, tested and run end to end. Its verdict is preliminary: the live database holds 1.8 h of bars, and the rule needs 7 days (E7). The run also found a calibration defect in the served recipe, now fixed, and a weakness in the approved rule (E9).
+
+- **Data.**
+  - `scripts/export_bars.py` writes a source's persisted bars to gzipped NDJSON in `data/exports/` (gitignored), one file per run, named by symbol, source and span. The helpers are `write_bar_export` and `read_bar_exports` in `market/persistence.py`.
+  - The study reads every export plus the database and keeps one bar per open time, so overlapping exports are harmless.
+  - Exported 2026-10-02: 6,562 live bars (6 sessions, 2026-09-26 13:17 to 2026-10-02 17:16 UTC) and 16,278 synthetic. The local database keeps bars for 7 days, so the oldest live session would have been pruned on 2026-10-03.
+- **The study** (`algoviz/ml/study.py`, run by `scripts/ml_study.py`; `just study` exports first).
+  - **Samples are the engine's own.** The bars go through `MLEngine.ingest_bar`, so feature vectors, rolling medians and session splits are as served. Each label definition relabels them with the served `barrier_bps` and `triple_barrier`, never across a session gap. A test checks that the served definition reproduces the engine's labels exactly, and that a 60 s horizon drops each session's last minute.
+  - **The grid.** Horizons 5, 15, 30, 60 and 120 s; k 0.5, 1 and 2; floors 0.5, 1, 2 and 4 bps: 60 label definitions. The three best are re-run without the hour-of-day features and without the median-scaled quantities.
+  - **Scoring.** Each configuration gets the served recipe's walk-forward on the first 75 % of its labelled samples, with training windows capped at `ML_MAX_SAMPLES`. It is scored against the class prior, the trailing prior and the logistic baseline.
+  - **The holdout.** The best configuration, by mean edge over the trailing prior, is scored once on the last 25 %. It is trained on the end of the development part, with an embargo of one horizon.
+  - **The rule.** `decide()` implements the rule as approved. Below 7 days of bars (counted as bars, not calendar span) it reports "preliminary" and decides nothing.
+    - A test plants an edge and checks that it is adopted on 8 days of bars but not on 1.
+    - The same test checks that shuffled labels are rejected.
+  - **The report** is Markdown with the data's span, the rule, the verdict, the holdout and every configuration: `docs/edge-study.md`. The full grid takes 3–4 minutes on today's bars, and two runs produced byte-identical tables.
+- **The trailing prior.**
+  - **Definition.** For each prediction, the class mix of the last 600 labels already resolved at that point (index ≤ i − horizon), Laplace-smoothed.
+  - **Walk-forward.** Every fold scores it (`FoldMetrics.trailing_prior_log_loss`; older artefacts load without it), and the out-of-sample summary adds `edge_vs_trailing_prior`.
+  - **Drift monitor.** The same baseline from live outcomes, lagged by the horizon, so it uses only outcomes resolved before each prediction. Its status reads "edge" only when both edges are positive. Tests check that neither version sees a label unresolved at prediction time.
+  - **Primed at startup** with the labels rebuilt from stored bars, all resolved before the first live prediction.
+    - Found on the live feed: after a restart the monitor knew no outcomes, so the first predictions were scored against a uniform trailing prior. Log-loss was 0.283 against 0.191 for the class prior, on 43 outcomes that were all flat, which flattered the edge.
+    - Primed, the prior starts from what was known. After this restart that was a mix half from yesterday's livelier session (30 % non-flat), so it lags a quiet market, as a trailing prior should.
+  - **UI.**
+    - The walk-forward panel draws the trailing prior on each fold's dot plot and adds a Trailing column. Its sentence counts the folds that beat the trailing prior.
+    - The edge badge is amber unless both edges are positive.
+    - The drift panel's edge tile shows the edge over the trailing prior.
+    - Models trained before Stage S render as before.
+- **Found by the study: calibration could serve certainty in a rare class (fixed).**
+  - **Symptom.** In the first full run, 9 configurations scored an edge of about −9 nats. In one fold of 5 s · k 1 · floor 2 bps, the raw model scored 0.10 nats and the calibrated model 36: it said p(down) = 1 on every row.
+  - **Cause** (scikit-learn 1.9.1, `CalibratedClassifierCV`).
+    - The window held all three classes, but the fit rows of every calibration split lacked "up".
+    - A two-class split model returns a single probability column, p(flat). scikit-learn fits that column's calibrator against the first class's indicator (down), and fills only that column.
+    - Normalising then turned the down column into certainty.
+  - **Fix.** `TailStoppedHGB(classes=…)` answers for every class in the window, with probability 0 for a class its fit rows lacked. Each class then gets its own calibrator, and an unseen class calibrates to its base rate.
+    - A regression test rebuilds the case and fails on the old code: mean p(flat) was 0 against a 95.7 % share.
+    - Models pickled before the change still load, predict and print (checked on live v40).
+  - **Reach.** At the served label (5 s, about 7 % per side) every split sees every class, so the served model was not affected in practice. The defect bit label definitions with a rare class.
+  - **Recorded, not changed.** Isotonic calibration still fits exact zeros where a class has only a handful of examples. In one fold at 5 s · floor 2 bps, 10 of 926 rows got p = 0 for their class. This is how isotonic calibration behaves, not a mapping error. Definitions where a class is about 1 % pay for it in this study.
+- **Preliminary result: 1.8 h of live bars, which decides nothing** (`docs/edge-study.md`).
+
+  | Label | Features | Edge vs class prior | Edge vs trailing prior | Folds beating it |
+  |---|---|--:|--:|--:|
+  | 120 s · k 2 · floor 2 bps | without scaled quantities | −0.016 | +0.163 ± 0.237 | 3 of 4 |
+  | 120 s · k 2 · floor 0.5 bps | all features | +0.022 | +0.041 ± 0.236 | 2 of 4 |
+  | 5 s · k 1 · floor 1 bps | all features | +0.004 | +0.001 ± 0.018 | 2 of 4 |
+  | 5 s · k 1 · floor 0.5 bps (served) | all features | −0.040 | −0.055 ± 0.053 | 0 of 4 |
+
+  - **The holdout** for the best (1,252 samples): log-loss 0.7365, against 0.8078 for the trailing prior and 0.6916 for the class prior. It beats the trailing prior and loses to the class prior.
+  - **The served definition** has no edge over either prior, in line with the standing finding.
+  - **Fold dispersion** (±0.2 nats at 60–120 s) exceeds every mean edge. 1.8 h of bars can't separate these configurations.
+  - **Fewer distinct labelings than definitions.** Where the floor exceeds k · σ · √h, k changes nothing; for example, the three k at 5 s · floor 4 bps are identical.
+  - **Calibration fallbacks.** 24 calibrations fell back to the uncalibrated model, because a class had fewer than 3 examples in the window. These are the served recipe's own fallbacks, logged as warnings.
+- **Decision needed (E9, §11.4): the rule's baseline.**
+  - At 60–120 s the trailing prior was a weaker baseline than the class prior: 0.81 against 0.69 on the holdout. A window of labels resolved two minutes earlier tracks noise.
+  - As approved, the rule tests only the trailing prior. It would therefore adopt this preliminary best, which loses to the class prior.
+  - **Recommendation:** require the edge over both priors, and select on the same. The drift monitor and the walk-forward badge already require both.
+  - Changing the rule now, before the deciding data exists, still pre-registers it for that data. But this run informed the change, so it is the owner's call. The code implements the rule as approved until then.
+- **Still needed (E7):** at least 7 days of live bars, from the Render Blueprint after the cutover or from `backend-live` on this machine. Then `just study` (or the two scripts) produces the deciding report.
+  - **Collection started on this machine on 2026-10-03.** The `backend-live` launch configuration (machine-local, `D:\My_Work\Projects\AlgoViz\.claude\launch.json`) now sets production's `SNAPSHOT_RETENTION_DAYS=60` and `ML_TRAIN_THREADS=1`, so its database keeps every session until the study runs.
+  - The study counts bars, not calendar days, so intermittent sessions add up: about 86,400 bars a day while it runs.
+  - Run one live backend at a time. A second would share the database and model directory, and their model versions would collide.
+- **e2e seed.** `SEED_VERSION` 2: the template is rebuilt only when its stamp changes, and the model manifest doesn't cover what training records. Without the bump, local e2e would keep serving a model without trailing-prior folds, while CI builds a fresh one.
+- **Checks:**
+  - **Backend.**
+    - ruff, ruff format and mypy are clean.
+    - pytest: 165 passed and 1 skipped, coverage 92.86 % (`study.py` 95 %). The run took 6.5 min with both dev servers running alongside, against the CI job's 20-minute limit.
+    - After the priming fix: 166 passed and 1 skipped, coverage 92.67 %, in 4.7 min with the live collector running.
+  - **Live feed, 2026-10-03.** v41 is the first live model trained with this stage's code: 8,144 samples, isotonic calibration.
+    - Held out, its log-loss is 0.464, against 0.440 for the class prior and 0.412 for the trailing prior. That is an edge of −0.024 and −0.052: still no edge.
+    - At the served 5 s horizon the trailing prior is the stronger baseline, the reverse of 120 s in the study. Requiring both (E9) means requiring the stronger one at each horizon.
+    - The Intelligence page on the production build shows the amber badge, the Trailing column and "…the trailing prior in 1 (mean edge −0.052)".
+    - pip-audit is clean. OpenAPI is fresh: the only additions over `main` are Stage R's heat columns and the two trailing-prior fields.
+    - New tests:
+      - the trailing prior sees only resolved labels, both in folds and in the drift monitor;
+      - the drift monitor's trailing prior starts from the labels rebuilt at startup;
+      - older artefacts load;
+      - the rule adopts a planted edge and nothing less;
+      - the study labels exactly as the engine does;
+      - the study scores, ablates and renders without deciding;
+      - exports round-trip and overlap without duplicates;
+      - calibration survives a class missing from its split models.
+  - **Frontend.** Prettier, tsc, eslint, Vitest 29, the build and npm@10 audit all pass.
+  - **Playwright.**
+    - First run: 38 of 39. The strategies spec timed out on its last step, because the DELETE got no response within 15.7 s. Every request in that test was slow (4–6 s), so the e2e backend was starved, most likely by its scheduled retrain about 10 minutes into the run alongside SwiftShader.
+    - Second run, on the rebuilt seed: 39 of 39.
+    - The visual baselines are unchanged. That spec leaves REST unanswered, so it pins panel anatomy, not model data.
+  - **Browser, synthetic backend.**
+    - A model trained before Stage S renders as before: no Trailing column, and the sentence is unchanged.
+    - After the engine retrained (v29), the dot plot shows the trailing-prior marker beside the class-prior ring. The Trailing column, the legend entry and the fold labels are present, and the sentence reads "…the trailing prior in 4 (mean edge +0.202)…".
+    - The drift tile reads "vs trailing prior +0.437 · at training +0.135".
+    - At 390 px the document is 390 wide, and the longer hint wraps without truncating.

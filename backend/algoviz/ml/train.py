@@ -16,9 +16,11 @@ Walk-forward evaluation runs the recipe inside each training window of
 label's forward window out of the test fold — and scores the calibrated fold
 model on the held-out fold. Per fold: accuracy, log-loss (calibrated and
 raw), the multiclass Brier score with its reliability / resolution /
-uncertainty decomposition, a reliability curve, and the same scores for two
-baselines: the class prior and a regularised logistic regression on clipped
-standardised features. "Edge" is the log-loss improvement over the prior.
+uncertainty decomposition, a reliability curve, and the same scores for three
+baselines: the class prior of the training window, a trailing prior (the class
+mix of the labels already resolved at each prediction, which follows drift),
+and a regularised logistic regression on clipped standardised features. "Edge"
+is the log-loss improvement over a prior.
 
 Permutation importance is measured on held-out folds with the fold's own
 served model and scored on log-loss: the increase in held-out log-loss when a
@@ -83,6 +85,8 @@ ISOTONIC_MIN = 1000  # isotonic needs data; sigmoid (Platt) is the small-sample 
 LOGISTIC_C = 0.1
 CLIP_SIGMA = 5.0  # standardised inputs are clipped so a heavy-tailed feature can't blow it up
 
+TRAILING_PRIOR_N = 600  # resolved labels behind each trailing-prior forecast (10 min of bars)
+
 IMPORTANCE_FOLDS = 2  # the most recent folds (largest training windows)
 IMPORTANCE_ROWS = 1500  # evenly spaced rows of a test fold, to bound the cost
 IMPORTANCE_REPEATS = 3
@@ -98,11 +102,21 @@ class TailStoppedHGB(ClassifierMixin, BaseEstimator):
     `ES_TAIL` of its (time-ordered) training window, `gap` rows after the fit
     rows, instead of HGB's built-in random split — which would let the model
     stop on rows interleaved with, and so leaking into, its training rows.
+
+    `classes` are the training window's classes. A calibration split's fit rows
+    can lack one of them; the model then still answers for it, with
+    probability 0, and the calibrator fitted for it learns its base rate.
+    Without that, scikit-learn calibrates a two-class split model in a
+    three-class window by pairing its one probability column with the wrong
+    class, and the ensemble serves certainty in a rare class.
     """
 
-    def __init__(self, gap: int = 0, seed: int = 7) -> None:
+    classes: tuple[int, ...] | None = None  # models pickled before it existed read the default
+
+    def __init__(self, gap: int = 0, seed: int = 7, classes: tuple[int, ...] | None = None) -> None:
         self.gap = gap
         self.seed = seed
+        self.classes = classes
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> TailStoppedHGB:
         n = len(X)
@@ -122,12 +136,17 @@ class TailStoppedHGB(ClassifierMixin, BaseEstimator):
                 random_state=self.seed,
             ).fit(X, y)
         self.model_ = model
-        self.classes_ = model.classes_
+        self.classes_ = model.classes_ if self.classes is None else np.asarray(self.classes)
         self.n_iter_ = int(model.n_iter_)
         return self
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
-        return self.model_.predict_proba(X)
+        p = self.model_.predict_proba(X)
+        if len(self.model_.classes_) == len(self.classes_):
+            return p
+        out = np.zeros((len(X), len(self.classes_)))
+        out[:, np.searchsorted(self.classes_, self.model_.classes_)] = p
+        return out
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         return self.model_.predict(X)
@@ -138,8 +157,9 @@ def fit_model(X: np.ndarray, y: np.ndarray, gap: int, seed: int = 7) -> tuple[An
     n = len(X)
     if n >= CAL_MIN:
         method = "isotonic" if n >= ISOTONIC_MIN else "sigmoid"
+        classes = tuple(int(c) for c in np.unique(y))
         calibrated = CalibratedClassifierCV(
-            estimator=TailStoppedHGB(gap=gap, seed=seed),
+            estimator=TailStoppedHGB(gap=gap, seed=seed, classes=classes),
             method=method,
             cv=TimeSeriesSplit(n_splits=CAL_SPLITS, gap=gap),
             ensemble=True,
@@ -190,6 +210,23 @@ def _prior_proba(y_train: np.ndarray, n: int) -> np.ndarray:
     return np.tile(p, (n, 1))
 
 
+def trailing_prior_proba(
+    y: np.ndarray, idx: np.ndarray, horizon_bars: int, window: int = TRAILING_PRIOR_N
+) -> np.ndarray:
+    """
+    For each row in `idx`, the class shares of the last `window` labels that had
+    resolved by its prediction time (a label resolves `horizon_bars` after its bar,
+    so index ≤ i − horizon_bars), Laplace-smoothed. The prior a forecaster could
+    actually have known: it follows the class mix as it drifts, which the fixed
+    training-window prior cannot, so beating it is the stricter test of skill.
+    """
+    counts = np.vstack([np.zeros(3), np.cumsum(np.eye(3)[y], axis=0)])  # counts[k] = labels[:k]
+    hi = np.clip(idx - horizon_bars + 1, 0, len(y))
+    lo = np.clip(hi - window, 0, None)
+    known = counts[hi] - counts[lo] + 1.0
+    return known / known.sum(axis=1, keepdims=True)
+
+
 def _neg_log_loss(model: Any, X: np.ndarray, y: np.ndarray) -> float:
     return -float(log_loss(y, _align_proba(model, X), labels=CLASSES))
 
@@ -213,6 +250,8 @@ class FoldMetrics:
     logistic_accuracy: float
     calibration: str
     reliability: Curve = field(default_factory=dict)
+    # None in artefacts trained before this baseline existed
+    trailing_prior_log_loss: float | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -230,11 +269,17 @@ class FoldMetrics:
             "logistic_accuracy": round(self.logistic_accuracy, 4),
             "calibration": self.calibration,
             "reliability": self.reliability,
+            "trailing_prior_log_loss": (
+                round(self.trailing_prior_log_loss, 4)
+                if self.trailing_prior_log_loss is not None
+                else None
+            ),
         }
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> FoldMetrics:
-        return cls(**{k: d[k] for k in cls.__dataclass_fields__})
+        # fields added since an artefact was saved take their defaults
+        return cls(**{k: d[k] for k in cls.__dataclass_fields__ if k in d})
 
 
 _MEAN_KEYS = (
@@ -275,6 +320,11 @@ class TrainResult:
             return {}
         agg = {k: float(np.mean([getattr(f, k) for f in self.folds])) for k in _MEAN_KEYS}
         agg["edge_vs_prior"] = agg["prior_log_loss"] - agg["log_loss"]
+        trailing = [f.trailing_prior_log_loss for f in self.folds]
+        known = [t for t in trailing if t is not None]
+        if len(known) == len(trailing):
+            agg["trailing_prior_log_loss"] = float(np.mean(known))
+            agg["edge_vs_trailing_prior"] = agg["trailing_prior_log_loss"] - agg["log_loss"]
         agg["edge_vs_logistic"] = agg["logistic_log_loss"] - agg["log_loss"]
         agg["calibration_gain"] = agg["raw_log_loss"] - agg["log_loss"]
         ece = calibration_error(self.reliability)
@@ -306,6 +356,72 @@ def _evenly_spaced(n: int, k: int) -> np.ndarray:
     return np.arange(n) if n <= k else np.linspace(0, n - 1, k).astype(int)
 
 
+def score_split(
+    X: np.ndarray,
+    y: np.ndarray,
+    tr: np.ndarray,
+    te: np.ndarray,
+    horizon_bars: int,
+    *,
+    seed: int = 7,
+) -> tuple[FoldMetrics, Any]:
+    """Fit the served recipe on rows `tr` and score it, with every baseline, on rows `te`."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model, method = fit_model(X[tr], y[tr], horizon_bars, seed)
+        yt = y[te]
+        p = _align_proba(model, X[te])
+        p_raw = _raw_proba(model, X[te])
+        p_lr = _align_proba(_logistic().fit(X[tr], y[tr]), X[te])
+    p_prior = _prior_proba(y[tr], len(te))
+    p_trail = trailing_prior_proba(y, te, horizon_bars)
+    dec = brier_decomposition(p, yt)
+    metrics = FoldMetrics(
+        n_train=len(tr),
+        n_test=len(te),
+        accuracy=float(accuracy_score(yt, p.argmax(axis=1))),
+        log_loss=float(log_loss(yt, p, labels=CLASSES)),
+        raw_log_loss=float(log_loss(yt, p_raw, labels=CLASSES)),
+        brier=dec["brier"],
+        brier_reliability=dec["reliability"],
+        brier_resolution=dec["resolution"],
+        brier_uncertainty=dec["uncertainty"],
+        prior_log_loss=float(log_loss(yt, p_prior, labels=CLASSES)),
+        logistic_log_loss=float(log_loss(yt, p_lr, labels=CLASSES)),
+        logistic_accuracy=float(accuracy_score(yt, p_lr.argmax(axis=1))),
+        calibration=method,
+        reliability=reliability_curve(p, yt),
+        trailing_prior_log_loss=float(log_loss(yt, p_trail, labels=CLASSES)),
+    )
+    return metrics, model
+
+
+def walk_forward(
+    X: np.ndarray,
+    y: np.ndarray,
+    horizon_bars: int,
+    *,
+    seed: int = 7,
+    max_train_size: int | None = None,
+) -> tuple[list[FoldMetrics], list[tuple[Any, np.ndarray, np.ndarray]]]:
+    """
+    The served recipe inside each training window of `TimeSeriesSplit(gap=horizon)`,
+    scored on the fold it never saw. Returns the fold metrics and, per fold, the
+    fold model with its held-out rows (for permutation importance).
+    """
+    folds: list[FoldMetrics] = []
+    held_out: list[tuple[Any, np.ndarray, np.ndarray]] = []  # (fold model, X_test, y_test)
+    n_splits = max(2, min(N_SPLITS, len(X) // (MIN_PER_FOLD * 2)))
+    outer = TimeSeriesSplit(n_splits=n_splits, gap=horizon_bars, max_train_size=max_train_size)
+    for tr, te in outer.split(X):
+        if len(np.unique(y[tr])) < 2:
+            continue
+        metrics, model = score_split(X, y, tr, te, horizon_bars, seed=seed)
+        folds.append(metrics)
+        held_out.append((model, X[te], y[te]))
+    return folds, held_out
+
+
 def train(
     X: np.ndarray,
     y: np.ndarray,
@@ -319,42 +435,10 @@ def train(
     if n < MIN_PER_FOLD * 3 or len(np.unique(y)) < 2:
         return None
 
-    folds: list[FoldMetrics] = []
-    held_out: list[tuple[Any, np.ndarray, np.ndarray]] = []  # (fold model, X_test, y_test)
+    folds, held_out = walk_forward(X, y, horizon_bars, seed=seed)
     n_splits = max(2, min(N_SPLITS, n // (MIN_PER_FOLD * 2)))
-    outer = TimeSeriesSplit(n_splits=n_splits, gap=horizon_bars)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        for tr, te in outer.split(X):
-            if len(np.unique(y[tr])) < 2:
-                continue
-            model, method = fit_model(X[tr], y[tr], horizon_bars, seed)
-            yt = y[te]
-            p = _align_proba(model, X[te])
-            p_raw = _raw_proba(model, X[te])
-            p_lr = _align_proba(_logistic().fit(X[tr], y[tr]), X[te])
-            p_prior = _prior_proba(y[tr], len(te))
-            dec = brier_decomposition(p, yt)
-            folds.append(
-                FoldMetrics(
-                    n_train=len(tr),
-                    n_test=len(te),
-                    accuracy=float(accuracy_score(yt, p.argmax(axis=1))),
-                    log_loss=float(log_loss(yt, p, labels=CLASSES)),
-                    raw_log_loss=float(log_loss(yt, p_raw, labels=CLASSES)),
-                    brier=dec["brier"],
-                    brier_reliability=dec["reliability"],
-                    brier_resolution=dec["resolution"],
-                    brier_uncertainty=dec["uncertainty"],
-                    prior_log_loss=float(log_loss(yt, p_prior, labels=CLASSES)),
-                    logistic_log_loss=float(log_loss(yt, p_lr, labels=CLASSES)),
-                    logistic_accuracy=float(accuracy_score(yt, p_lr.argmax(axis=1))),
-                    calibration=method,
-                    reliability=reliability_curve(p, yt),
-                )
-            )
-            held_out.append((model, X[te], yt))
-
         # Held-out permutation importance: the fold's own served model, scored on log-loss.
         drops: list[np.ndarray] = []
         for model, Xt, yt in held_out[-IMPORTANCE_FOLDS:]:

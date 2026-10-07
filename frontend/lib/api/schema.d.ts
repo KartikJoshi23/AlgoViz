@@ -1244,6 +1244,8 @@ export interface components {
             directional_hit_rate?: number | null;
             /** Edge Vs Prior */
             edge_vs_prior?: number | null;
+            /** Edge Vs Trailing Prior */
+            edge_vs_trailing_prior?: number | null;
             /** Hit Rate */
             hit_rate?: number | null;
             /** Log Loss */
@@ -1269,6 +1271,8 @@ export interface components {
             status: "no_data" | "edge" | "no_edge" | "decayed";
             /** Total Resolved */
             total_resolved: number;
+            /** Trailing Prior Log Loss */
+            trailing_prior_log_loss?: number | null;
             /** Train Log Loss */
             train_log_loss?: number | null;
             /** Train Prior Log Loss */
@@ -1459,6 +1463,8 @@ export interface components {
             /** Raw Log Loss */
             raw_log_loss: number;
             reliability: components["schemas"]["ReliabilityCurve"];
+            /** Trailing Prior Log Loss */
+            trailing_prior_log_loss?: number | null;
         };
         /**
          * HealthResponse

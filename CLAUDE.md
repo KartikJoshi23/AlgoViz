@@ -21,15 +21,18 @@ These rules come from the owner and still apply:
    - The frontend stays polished: the "midnight glass" design system, hover states on every interactive element, motion that reflects live market state, and full `prefers-reduced-motion` and low-GPU-tier fallbacks.
    - Dark theme only, WCAG AA, axe-clean.
 
-## Where it stands (2026-10-01)
+## Where it stands (2026-10-03)
 
 - **Phase 4 is complete:** stages G, J, K, L, H, M, plus the theme v3 overhaul. Stage M was approved 2026-10-01.
 - **Phase 5** (`docs/implementation-plan.md` §11) was approved 2026-10-01 with every recommendation (E1–E8). The order is N → P → Q → R → S.
   - **Stage N's repository side is pushed** (`ef448e3`) and awaits the owner's cutover.
   - The hang fix and **Stage P** are pushed (`bea471a`, `6fe1575`); CI #14 was all green.
   - **Stage Q** (reliability) is pushed (`91af87b`); CI #16 was all green.
-  - Its last item, the Linux visual baselines, waits on Docker Desktop: its engine didn't start (2026-10-02), and the owner should check its window.
-  - **Stage R** (heatmap history, read-outs) is delivered in the working tree and awaits review and a push. **Stage S** (the edge study) is next.
+  - Its last item, the Linux visual baselines, waits on Docker Desktop. Its engine didn't start on 2026-10-02 or 2026-10-03: the app runs, but the `docker-desktop` WSL distribution stays stopped. The owner should check its window for a prompt.
+  - **Stages R** (heatmap history, read-outs) **and S** (the edge study) are delivered in the working tree and await review and a push.
+    - R's diff alone is saved as a patch in the session scratchpad, so R and S can be committed separately.
+    - S's verdict is preliminary until 7 days of live bars exist (E7). Collection runs on this machine through `backend-live`, now configured with 60-day retention (plan §11.5, Stage S).
+    - S raised decision E9 (the rule's baseline, plan §11.4) for the owner.
   - The owner's cutover steps are listed at the end of that entry: the push, the Render Blueprint, the Vercel environment variables.
   - After the cutover, verify with `python backend/scripts/smoke_deploy.py https://<backend>`. Only the owner runs it `--with-token`: the token never passes through Claude.
 - **Git:** the whole rebuild (Phases 3 and 4) is on `main`, pushed 2026-10-01 at the owner's request as a fast-forward. `overhaul/phase-3-4` is the merged branch and can be deleted.
@@ -52,9 +55,12 @@ These rules come from the owner and still apply:
   - Linux visual baselines. These need the `mcr.microsoft.com/playwright` Docker image (~2 GB); CI skips the visual spec off Windows meanwhile.
   - A migration run against a real Postgres (Docker image). The DDL was only verified offline. Hosting now uses SQLite (E1), so this matters only if Postgres is adopted later.
   - `gh` CLI auth on this machine was invalid at hand-off: `gh auth login`.
-- **Honest model finding:** on live BTC at a 5 s horizon the calibrated model has ~no edge over the class prior (edge −0.045 … +0.0015, through v40). Never present it as predictive.
+- **Honest model finding:** on live BTC at a 5 s horizon the calibrated model has ~no edge over the class prior (edge −0.045 … +0.0015 through v40; v41 on 2026-10-03: −0.024 vs the class prior, −0.052 vs the trailing prior). Never present it as predictive.
   - The evidence is only 3.2 h of live bars (8 sessions over 4 days), and bar retention is 7 days.
-  - §11 (W5) plans a proper study: longer horizons, labels with a floor above spread noise, features that survive regime drift.
+  - The edge study (Stage S, `docs/edge-study.md`) tests 60 label definitions against a rule fixed in advance.
+    - On 1.8 h of live bars it is preliminary and decides nothing.
+    - No definition beats both priors convincingly; fold dispersion exceeds every mean edge.
+    - Re-run it with `just study` once 7 days of bars exist, exporting them (`scripts/export_bars.py`) before retention prunes them.
 
 ## Running it
 
@@ -70,7 +76,7 @@ These rules come from the owner and still apply:
 
 - **Backend** (in `backend/`):
   - `ruff check .`, `ruff format --check .`, `mypy`
-  - `pytest -q --cov` — 158 tests (one is POSIX-only, so 157 pass and 1 skips on Windows), coverage floor 90 % (92.49 % now)
+  - `pytest -q --cov` — 167 tests (one is POSIX-only, so 166 pass and 1 skips on Windows), coverage floor 90 % (92.67 % now)
   - `pip-audit -r requirements.txt -r constraints.txt --strict`
   - OpenAPI freshness
 - **Frontend** (in `frontend/`): `npm run format:check`, `npm run check` (tsc · eslint · vitest 29 · next build), `npm audit --audit-level=high`.
@@ -96,11 +102,12 @@ These rules come from the owner and still apply:
 - Check mobile overflow against the device width (390), not `innerWidth`: emulation widens the layout viewport.
 - `toBeVisible` does not detect occlusion; use `elementFromPoint`.
 - Headless Playwright auto-dismisses `window.confirm`; accept dialogs in probe scripts.
+- The e2e backend retrains about 10 minutes into a run. Requests slow to seconds around then; once, a strategy DELETE got no answer within the spec's 20 s. Check the trace's request timings and rerun before chasing it.
+- The visual spec leaves every REST call unanswered, so it pins panel anatomy, not model data. When training changes what the model records, bump `SEED_VERSION` in `scripts/seed_e2e.py`, because the seed's stamp doesn't see it.
 - Timing on SwiftShader is noise (LCP 3–9 s for the same build). Budget bytes and CLS, and only hang-guard timings. Judge visuals and fps on the real GPU (headless Chromium with `--use-angle=d3d11 --enable-gpu`).
 - Judge microstructure visuals on `backend-live`; the synthetic book slides its levels with the mid.
 - Playwright prints a web server's stderr only. To see its stdout (Next's "Ready", the launcher command), run with `DEBUG=pw:webserver`. Outside CI it reuses any server already listening on :3100 or :8010, so stop stray servers before trusting a run.
 - Local npm 9.6 exits 0 on a critical `npm audit` finding at `--audit-level=high`; npm 10 (CI) exits 1. Audit locally with `npx -y npm@10 audit --audit-level=high`.
-- `scripts/export_openapi.py` writes CRLF on Windows, so `openapi.json` shows as modified even when the JSON is identical. Compare with `git diff --ignore-cr-at-eol`.
 
 **Backend and ML**
 - Coverage needs `concurrency = ["thread", "greenlet"]` (SQLAlchemy async runs in greenlets). Without it the API modules read ~60 %.
@@ -112,6 +119,10 @@ These rules come from the owner and still apply:
 - To diagnose a hang: `py-spy dump` shows thread stacks (idle threads here). The answer came from asyncio *task* stacks, via a scratch pytest plugin that calls `task.print_stack()` on a timer (loaded with `-p`).
 - Training and HMM fits run in spawned processes. On Windows, `Process.start()` blocks while pickling arguments, so start them off the loop.
 - SHAP explainers aren't picklable; they are built on the inference thread one at a time.
+- **`CalibratedClassifierCV` and rare classes.**
+  - If a calibration split's fit rows lack one of the window's classes, scikit-learn (1.9) pairs the two-class split model's single probability column with the wrong class, and the ensemble serves p = 1 for a rare class.
+  - `TailStoppedHGB(classes=…)` answers for every class in the window, which prevents it. Keep that when changing the recipe.
+  - Isotonic calibration still fits exact zeros when a class has only a handful of examples. A label definition where a class is about 1 % will show that as huge log-loss.
 - Model artefacts carry a manifest (feature-schema hash, horizon, labels). Bump `FEATURE_SCHEMA_VERSION` in `ml/features.py` whenever a feature's definition changes.
 - The regime is two axes: a volatility state (calm / normal / elevated / extreme) and a trend (down / flat / up). Renaming categorical values needs an Alembic data migration (see `4c1e7b2a9d30`).
 

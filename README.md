@@ -169,7 +169,8 @@ Leaves are `{"f", "op", "v"}`; groups are `all` / `any` / `not`. Missing values 
 
 ## Honesty notes
 
-- Model metrics are **walk-forward and evaluated as served**. Each fold is built with the same recipe as the live model (time-tail early stopping, calibration on embargoed splits), inside `TimeSeriesSplit` with an embargo equal to the label horizon. It is scored held-out against the class prior and a regularised logistic baseline, with reliability curves and the Brier decomposition. "Edge" means beating the prior out of sample. On live BTC at a 5 s horizon it does not, and the UI says so.
+- Model metrics are **walk-forward and evaluated as served**. Each fold is built with the same recipe as the live model (time-tail early stopping, calibration on embargoed splits), inside `TimeSeriesSplit` with an embargo equal to the label horizon. It is scored held-out against the class prior, the trailing prior (the class mix of the labels already resolved at each prediction) and a regularised logistic baseline, with reliability curves and the Brier decomposition. "Edge" means beating both priors out of sample. On live BTC at a 5 s horizon it does not, and the UI says so.
+- Other label definitions are tested by an edge study (`backend/scripts/ml_study.py`, report in `docs/edge-study.md`) against a rule fixed in advance. It decides nothing on fewer than 7 days of bars.
 - Feature importance is the rise in held-out log-loss when a feature is shuffled. SHAP explains the served ensemble's tree models before calibration, and is labelled as such.
 - The drift monitor scores live predictions against realised moves; the registry keeps every training run.
 - Backtests fill at the next bar's close with slippage and commission, check stops and targets against the extremes of the bars *after* the fill, and are labelled `synthetic` when fewer than `BACKTEST_MIN_BARS` real bars were available. Sharpe/Sortino are annualised from 1-minute returns over a short window — treat them as indicative.
@@ -196,7 +197,7 @@ python backend/scripts/export_openapi.py && (cd frontend && npm run types)
 
 The Playwright suite covers smoke and page flows, strategies and alerts, WCAG 2.2 AA (axe), visual baselines (recorded on Windows), performance budgets on the non-3D routes, and a WebGL project forcing the mid tier. Every run starts from the same seeded database and trained model (`backend/scripts/seed_e2e.py`). Hooks: `pip install pre-commit && pre-commit install` runs ruff, prettier and eslint with the project's own pinned versions.
 
-Migrations: `cd backend && alembic upgrade head` (run automatically at startup). Record a stream for replay: `python backend/scripts/record_stream.py --seconds 120`.
+Migrations: `cd backend && alembic upgrade head` (run automatically at startup). Record a stream for replay: `python backend/scripts/record_stream.py --seconds 120`. Save bars past retention: `python backend/scripts/export_bars.py`; then run the edge study on them: `python backend/scripts/ml_study.py --out docs/edge-study.md`.
 
 ### Project structure
 
@@ -204,13 +205,14 @@ Migrations: `cd backend && alembic upgrade head` (run automatically at startup).
 backend/
   algoviz/
     market/      sources (binance, replay, synthetic), book, features, baselines, bars, regime, catalog, persistence, service
-    ml/          features, labels, train, evaluation, registry, explain, drift, engine
+    ml/          features, labels, train, evaluation, registry, explain, drift, engine, study
     signals/     rules, engine            alerts/   notify, evaluator
     backtest/    strategy, engine, metrics, service
     api/         market, analytics, strategies, alerts, auth, system     ws/  hub
     core/        time, logging, auth, middleware, problems, metrics, workers, looplag, users, conditions
     schemas/     rest, ws                  db/  session, migrations, types  models/
-  alembic/  scripts/ (export_openapi, record_stream, seed_e2e, smoke_deploy)  tests/  Dockerfile  pyproject.toml
+  alembic/  scripts/ (export_openapi, freeze_constraints, record_stream, seed_e2e, smoke_deploy,
+           export_bars, ml_study)  tests/  Dockerfile  pyproject.toml
 frontend/
   app/           routes (/, /book, /intelligence, /strategies, /alerts, /settings), globals.css (tokens), ds.css (components)
   components/    ds (design system), panels, charts, three (Terrain, shaders), conditions, strategies, alerts, intelligence, ui

@@ -242,8 +242,10 @@ def test_drift_monitor_statuses() -> None:
     d.reset_baseline(
         {"down": 0.3, "flat": 0.4, "up": 0.3}, oos_log_loss=0.9, oos_prior_log_loss=1.09
     )
-    for i in range(30):  # confident and right → edge
-        d.record(Outcome(i, (0.1, 0.1, 0.8), 2, 2, 3.0))
+    for i in range(30):  # confident and right on a mixed sequence → edge over both priors
+        up = i % 2 == 0
+        d.record(Outcome(i, (0.1, 0.1, 0.8) if up else (0.8, 0.1, 0.1), 2 if up else 0,
+                         2 if up else 0, 3.0 if up else -3.0))  # fmt: skip
     s = d.summary()
     assert s["status"] == "edge" and s["hit_rate"] == 1.0 and s["edge_vs_prior"] > 0
     d2 = DriftMonitor(window=100, min_n=10)
@@ -263,6 +265,32 @@ def test_drift_hit_rate_comes_with_the_priors_own_hit_rate() -> None:
         d.record(Outcome(i, (0.1, 0.8, 0.1), 1, 2 if i % 5 == 0 else 1, 0.0))  # 80 % flat
     s = d.summary()
     assert s["hit_rate"] == s["prior_hit_rate"] == 0.8
+
+
+def test_drift_trailing_prior_knows_only_outcomes_resolved_before_the_prediction() -> None:
+    # With a 2-bar horizon, the last two resolutions came after this prediction was made.
+    d = DriftMonitor(window=100, min_n=3, lag=2)
+    outcomes = [Outcome(i, (1 / 3, 1 / 3, 1 / 3), 1, r, 0.0) for i, r in enumerate([0, 0, 0, 2, 2])]
+    for o in outcomes:
+        d.record(o)
+    assert outcomes[0].trailing == pytest.approx((1 / 3, 1 / 3, 1 / 3))  # nothing known yet
+    assert outcomes[4].trailing == pytest.approx((3 / 5, 1 / 5, 1 / 5))  # down, down
+    s = d.summary()
+    assert s["edge_vs_trailing_prior"] == pytest.approx(
+        s["trailing_prior_log_loss"] - s["log_loss"], abs=1e-3
+    )
+    # a model that only matches the trailing prior has no edge, whatever the fixed prior says
+    assert s["status"] == "no_edge"
+
+
+def test_drift_trailing_prior_starts_from_the_labels_rebuilt_at_startup() -> None:
+    # After a restart, the first prediction is scored against the stored history's class mix,
+    # not a uniform prior. The last `lag` labels are held back, as for any prediction.
+    d = DriftMonitor(window=100, min_n=3, lag=2)
+    d.prime([1] * 10)
+    first = Outcome(0, (1 / 3, 1 / 3, 1 / 3), 1, 1, 0.0)
+    d.record(first)
+    assert first.trailing == pytest.approx((1 / 11, 9 / 11, 1 / 11))  # 8 flats, Laplace
 
 
 # ── Backtest ──────────────────────────────────────────────────────

@@ -1632,6 +1632,17 @@
             ],
             "title": "Edge Vs Prior"
           },
+          "edge_vs_trailing_prior": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edge Vs Trailing Prior"
+          },
           "hit_rate": {
             "anyOf": [
               {
@@ -1722,6 +1733,17 @@
           "total_resolved": {
             "title": "Total Resolved",
             "type": "integer"
+          },
+          "trailing_prior_log_loss": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trailing Prior Log Loss"
           },
           "train_log_loss": {
             "anyOf": [
@@ -2459,6 +2481,17 @@
           },
           "reliability": {
             "$ref": "#/components/schemas/ReliabilityCurve"
+          },
+          "trailing_prior_log_loss": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trailing Prior Log Loss"
           }
         },
         "required": [

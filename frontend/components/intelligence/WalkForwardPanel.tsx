@@ -12,8 +12,10 @@ const fmt3 = (v: number | null | undefined) => (v == null || !Number.isFinite(v)
 /**
  * Held-out log-loss per walk-forward fold, as a dot plot: the model — built
  * with the served recipe inside each training window, so what is scored is
- * what is served — against the class prior (the bar for "edge") and a
- * regularised logistic baseline. The scale fits the model and prior; a
+ * what is served — against the class prior (the bar for "edge"), the
+ * trailing prior (the class mix of the labels already resolved at each
+ * prediction: recent history, which a model must also beat) and a
+ * regularised logistic baseline. The scale fits the model and priors; a
  * baseline far outside it is pinned to the edge with its value, so one bad
  * fold can't flatten the comparison that matters.
  */
@@ -21,10 +23,12 @@ export function WalkForwardPanel({ info, className }: { info: ModelInfo | undefi
   const folds = useMemo(() => info?.metrics.folds ?? [], [info?.metrics.folds]);
   const oos = (info?.metrics.oos ?? {}) as Record<string, number>;
   const edge = oos.edge_vs_prior;
-  const edgeTone: BadgeTone = edge == null ? "neutral" : edge > 0 ? "good" : "warning";
+  const edgeTrailing = oos.edge_vs_trailing_prior;
+  // An edge over the class prior alone is not an edge if recent history does as well.
+  const edgeTone: BadgeTone = edge == null ? "neutral" : edge > 0 && (edgeTrailing == null || edgeTrailing > 0) ? "good" : "warning";
 
   const scale = useMemo(() => {
-    const core = folds.flatMap((f) => [f.log_loss, f.prior_log_loss]).filter(Number.isFinite);
+    const core = folds.flatMap((f) => [f.log_loss, f.prior_log_loss, f.trailing_prior_log_loss ?? NaN]).filter(Number.isFinite);
     if (core.length === 0) return null;
     let lo = Math.min(...core);
     let hi = Math.max(...core);
@@ -38,6 +42,8 @@ export function WalkForwardPanel({ info, className }: { info: ModelInfo | undefi
   }, [folds]);
   const pct = (v: number) => (scale ? ((v - scale.lo) / (scale.hi - scale.lo)) * 100 : 0);
   const beatsPrior = folds.filter((f) => f.log_loss < f.prior_log_loss).length;
+  const hasTrailing = folds.every((f) => f.trailing_prior_log_loss != null);
+  const beatsTrailing = folds.filter((f) => f.trailing_prior_log_loss != null && f.log_loss < f.trailing_prior_log_loss).length;
   const beatsLogistic = folds.filter((f) => f.log_loss < f.logistic_log_loss).length;
 
   return (
@@ -69,6 +75,11 @@ export function WalkForwardPanel({ info, className }: { info: ModelInfo | undefi
             <span className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full border-2 border-ink-muted" aria-hidden /> class prior
             </span>
+            {hasTrailing && (
+              <span className="flex items-center gap-1.5">
+                <span className="h-3 w-0.5 rounded-full bg-ink" aria-hidden /> trailing prior
+              </span>
+            )}
             <span className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rotate-45 rounded-[2px] bg-mid" aria-hidden /> logistic baseline
             </span>
@@ -82,7 +93,7 @@ export function WalkForwardPanel({ info, className }: { info: ModelInfo | undefi
                 <li
                   key={i}
                   className="row grid grid-cols-[7rem_1fr] items-center gap-3 px-2 py-1.5"
-                  aria-label={`Fold ${i + 1}: model ${fmt3(f.log_loss)}, prior ${fmt3(f.prior_log_loss)}, logistic ${fmt3(f.logistic_log_loss)}`}
+                  aria-label={`Fold ${i + 1}: model ${fmt3(f.log_loss)}, prior ${fmt3(f.prior_log_loss)}${hasTrailing ? `, trailing prior ${fmt3(f.trailing_prior_log_loss)}` : ""}, logistic ${fmt3(f.logistic_log_loss)}`}
                 >
                   <span>
                     <span className="block text-meta text-ink">Fold {i + 1}</span>
@@ -112,6 +123,12 @@ export function WalkForwardPanel({ info, className }: { info: ModelInfo | undefi
                       className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-ink-muted bg-panel"
                       style={{ left: `${pct(f.prior_log_loss)}%` }}
                     />
+                    {f.trailing_prior_log_loss != null && (
+                      <span
+                        className="absolute top-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ink"
+                        style={{ left: `${pct(f.trailing_prior_log_loss)}%` }}
+                      />
+                    )}
                     <span
                       className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent ring-2 ring-panel"
                       style={{ left: `${pct(f.log_loss)}%` }}
@@ -129,9 +146,10 @@ export function WalkForwardPanel({ info, className }: { info: ModelInfo | undefi
             ))}
           </div>
           <p className="mt-2 text-meta text-ink-muted">
-            The model beats the class prior in {beatsPrior} of {folds.length} folds and the logistic baseline in {beatsLogistic}. Each
-            fold&apos;s model is trained, early-stopped on the time-ordered tail and calibrated inside its own training window, then scored
-            on the fold it never saw.
+            The model beats the class prior in {beatsPrior} of {folds.length} folds
+            {hasTrailing && `, the trailing prior in ${beatsTrailing} (mean edge ${fmtSigned(edgeTrailing ?? null, 3)})`} and the logistic
+            baseline in {beatsLogistic}. Each fold&apos;s model is trained, early-stopped on the time-ordered tail and calibrated inside its
+            own training window, then scored on the fold it never saw.
           </p>
           {oos.brier != null && (
             <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Held-out Brier score decomposition, mean over folds">
@@ -153,6 +171,7 @@ export function WalkForwardPanel({ info, className }: { info: ModelInfo | undefi
                   <th className="cell-num">Log-loss</th>
                   <th className="cell-num">Raw</th>
                   <th className="cell-num">Prior</th>
+                  {hasTrailing && <th className="cell-num">Trailing</th>}
                   <th className="cell-num">Logistic</th>
                   <th className="cell-num">Brier</th>
                   <th className="cell-num">Reliability</th>
@@ -173,6 +192,7 @@ export function WalkForwardPanel({ info, className }: { info: ModelInfo | undefi
                       <td className="cell-num">{fmt3(f.log_loss)}</td>
                       <td className="cell-num text-ink-muted">{fmt3(f.raw_log_loss)}</td>
                       <td className="cell-num text-ink-muted">{fmt3(f.prior_log_loss)}</td>
+                      {hasTrailing && <td className="cell-num text-ink-muted">{fmt3(f.trailing_prior_log_loss)}</td>}
                       <td className="cell-num text-ink-muted">{fmt3(f.logistic_log_loss)}</td>
                       <td className="cell-num">{fmt3(f.brier)}</td>
                       <td className="cell-num text-ink-muted">{f.brier_reliability.toFixed(4)}</td>

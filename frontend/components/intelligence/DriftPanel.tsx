@@ -64,7 +64,7 @@ export function DriftPanel({ symbol, className }: { symbol: string | null; class
             <MetricTile
               label="Edge vs prior"
               value={fmtSigned(s.edge_vs_prior ?? null, 3)}
-              hint={`at training ${fmtSigned(trainEdge, 3)}`}
+              hint={`vs trailing prior ${fmtSigned(s.edge_vs_trailing_prior ?? null, 3)} · at training ${fmtSigned(trainEdge, 3)}`}
             />
             <MetricTile
               label="Mean |move|"

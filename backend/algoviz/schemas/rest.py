@@ -321,6 +321,8 @@ class FoldMetricsResponse(BaseModel):
     logistic_accuracy: float
     calibration: Literal["isotonic", "sigmoid", "none"]
     reliability: ReliabilityCurve
+    # the class mix of labels already resolved at each prediction; None for older models
+    trailing_prior_log_loss: float | None = None
 
 
 class ModelMetrics(BaseModel):

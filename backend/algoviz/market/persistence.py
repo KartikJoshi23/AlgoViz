@@ -8,16 +8,20 @@ every few seconds in multi-row inserts (ignoring duplicates on the
 database's bound-parameter limit. An hourly prune enforces the retention
 windows for bars, predictions and alert history. Reads (`load_bars`,
 `iter_bars`) serve the REST history endpoint, the WS snapshot-on-connect,
-training-set reconstruction and the backtester.
+training-set reconstruction and the backtester. Exports (`write_bar_export`,
+`read_bar_exports`) keep bars past retention for offline study.
 """
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
+import gzip
+import json
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterable, Sequence
 from datetime import timedelta
+from pathlib import Path
 from typing import Any, Protocol
 
 from sqlalchemy import delete, select, text
@@ -301,3 +305,26 @@ async def count_bars(
         q = q.where(MarketSnapshot.source == source)
     async with session_factory() as session:
         return int((await session.execute(q)).scalar_one())
+
+
+# ── Exports (bars past retention) ─────────────────────────────────
+
+
+def write_bar_export(bars: Sequence[Bar], path: Path) -> None:
+    """Bars as gzipped NDJSON, one `Bar.to_dict()` per line, in the order given."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with gzip.open(path, "wt", encoding="utf-8", newline="\n") as fh:
+        for bar in bars:
+            fh.write(json.dumps(bar.to_dict(), separators=(",", ":")) + "\n")
+
+
+def read_bar_exports(paths: Iterable[Path]) -> list[Bar]:
+    """Bars from export files, oldest first, one per (symbol, source, open time)."""
+    bars: dict[tuple[str, str, int], Bar] = {}
+    for path in paths:
+        with gzip.open(path, "rt", encoding="utf-8") as fh:
+            for line in fh:
+                if line.strip():
+                    bar = Bar(**json.loads(line))
+                    bars[(bar.symbol, bar.source, bar.ts_ms)] = bar
+    return sorted(bars.values(), key=lambda b: b.ts_ms)
