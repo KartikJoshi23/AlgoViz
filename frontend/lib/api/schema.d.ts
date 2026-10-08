@@ -125,6 +125,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analytics/edge-study": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The latest edge study on this host, and how far data collection has come */
+        get: operations["get_edge_study_api_v1_analytics_edge_study_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analytics/model-info": {
         parameters: {
             query?: never;
@@ -1187,6 +1204,39 @@ export interface components {
             updates_applied: number;
         };
         /**
+         * CollectionProgress
+         * @description The persisted bars that feed the study, and how far toward the deciding run they are.
+         */
+        CollectionProgress: {
+            /** Bars */
+            bars: number;
+            /** Bars Since Freeze */
+            bars_since_freeze: number;
+            /**
+             * Days
+             * @description Days of bars (bars / 86,400), not calendar span
+             */
+            days: number;
+            /** Days Required */
+            days_required: number;
+            /** Days Since Freeze */
+            days_since_freeze: number;
+            /** Freeze Ms */
+            freeze_ms: number;
+            /** Newest Age S */
+            newest_age_s: number | null;
+            /** Newest Ms */
+            newest_ms: number | null;
+            /** Oldest Ms */
+            oldest_ms: number | null;
+            /** Retention Days */
+            retention_days: number;
+            /** Source */
+            source: string;
+            /** Symbol */
+            symbol: string;
+        };
+        /**
          * DepthProfile
          * @description Cumulative depth per bin from mid outward (see `LocalOrderBook.depth_profile`).
          */
@@ -1277,6 +1327,126 @@ export interface components {
             train_log_loss?: number | null;
             /** Train Prior Log Loss */
             train_prior_log_loss?: number | null;
+        };
+        /**
+         * EdgeStudyConfig
+         * @description One configuration of the edge study: a label definition, features and training window.
+         */
+        EdgeStudyConfig: {
+            /** Barrier K */
+            barrier_k: number;
+            /**
+             * Edge
+             * @description Mean edge over the better prior, across quarters
+             */
+            edge: number | null;
+            /** Edge Sd */
+            edge_sd: number | null;
+            /** Edge Vs Prior */
+            edge_vs_prior: number | null;
+            /** Edge Vs Trailing Prior */
+            edge_vs_trailing_prior: number | null;
+            /** Features */
+            features: string;
+            /** Flat Share */
+            flat_share: number;
+            /** Floor Bps */
+            floor_bps: number;
+            /** Horizon S */
+            horizon_s: number;
+            /** Label */
+            label: string;
+            /** Quarters */
+            quarters: number;
+            /** Quarters Beating */
+            quarters_beating: number;
+            /** Samples */
+            samples: number;
+            /** Training */
+            training: string;
+        };
+        /** EdgeStudyData */
+        EdgeStudyData: {
+            /** Bars */
+            bars: number;
+            /** Days */
+            days: number;
+            /** First Ms */
+            first_ms: number;
+            /** Last Ms */
+            last_ms: number;
+            /** Samples */
+            samples: number;
+            /** Sessions */
+            sessions: number;
+        };
+        /** EdgeStudyHoldout */
+        EdgeStudyHoldout: {
+            /** Edge */
+            edge: number;
+            /** Log Loss */
+            log_loss: number;
+            /** Prior Log Loss */
+            prior_log_loss: number;
+            /** Samples */
+            samples: number;
+            /** Trailing Prior Log Loss */
+            trailing_prior_log_loss: number;
+        };
+        /**
+         * EdgeStudyReport
+         * @description The latest report of `scripts/ml_study.py` on this host.
+         */
+        EdgeStudyReport: {
+            best: components["schemas"]["EdgeStudyConfig"] | null;
+            /** Configurations */
+            configurations: number;
+            data: components["schemas"]["EdgeStudyData"];
+            /** Deciding */
+            deciding: boolean;
+            /** Freeze Ms */
+            freeze_ms: number;
+            /** Generated Ms */
+            generated_ms: number;
+            holdout: components["schemas"]["EdgeStudyHoldout"] | null;
+            /**
+             * Protocol
+             * @description Digest of docs/edge-study-protocol.md
+             */
+            protocol: string | null;
+            rule: components["schemas"]["EdgeStudyRule"];
+            /** Top */
+            top: components["schemas"]["EdgeStudyConfig"][];
+            verdict: components["schemas"]["EdgeStudyVerdict"];
+        };
+        /** EdgeStudyResponse */
+        EdgeStudyResponse: {
+            collection: components["schemas"]["CollectionProgress"];
+            /** @description None when no study has run on this host */
+            study: components["schemas"]["EdgeStudyReport"] | null;
+        };
+        /** EdgeStudyRule */
+        EdgeStudyRule: {
+            /** Block */
+            block: number;
+            /** Blocks Per Quarter */
+            blocks_per_quarter: number;
+            /** Min Days */
+            min_days: number;
+            /** Min Quarters Beating */
+            min_quarters_beating: number;
+            /** Quarters */
+            quarters: number;
+        };
+        /** EdgeStudyVerdict */
+        EdgeStudyVerdict: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "exploratory" | "preliminary" | "too_few" | "no_holdout" | "no_edge" | "adopt";
+            /** Reason */
+            reason: string;
         };
         /** ErrorMessage */
         ErrorMessage: {
@@ -2785,6 +2955,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DriftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_edge_study_api_v1_analytics_edge_study_get: {
+        parameters: {
+            query?: {
+                /** @description Symbol; defaults to the primary symbol */
+                symbol?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EdgeStudyResponse"];
                 };
             };
             /** @description Validation Error */

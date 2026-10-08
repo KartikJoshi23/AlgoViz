@@ -59,6 +59,7 @@ export default defineConfig({
         DATA_SOURCE: "synthetic",
         DATABASE_URL: "sqlite+aiosqlite:///./data/e2e.db",
         ML_MODEL_DIR: "./data/e2e_models",
+        EDGE_STUDY_FILE: "./data/e2e-edge-study.json", // never written: the no-study state
         BACKTEST_MIN_BARS: "50",
         BACKTEST_SYNTHETIC_BARS: "600",
         CORS_ORIGINS: JSON.stringify([WEB, `http://localhost:${WEB_PORT}`]),

@@ -177,7 +177,10 @@ class MarketSnapshot(Base):
     """One row per 1-second bar per symbol. Features + future mid → ML training set."""
 
     __tablename__ = "market_snapshots"
-    __table_args__ = (Index("ix_market_symbol_ts", "symbol", "timestamp", unique=True),)
+    __table_args__ = (
+        Index("ix_market_symbol_ts", "symbol", "timestamp", unique=True),
+        Index("ix_market_symbol_source_ts", "symbol", "source", "timestamp"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     symbol: Mapped[str] = mapped_column(String(20), nullable=False)

@@ -1452,7 +1452,7 @@ Stage letters continue from Phase 4, skipping O (as I was skipped).
 
 ## 12. Phase 6 — Make the edge question answerable, and visible (proposed)
 
-> **Status:** proposed 2026-10-08, after the owner chose this direction over housekeeping only or a pause. Approved the same day ("continue") with the recommended decisions F1–F6. Stage T was pushed on 2026-10-08, and the protocol is frozen (14:55 UTC). Stage V is delivered in the working tree; next is Stage U. Stages keep §7's review-stop discipline.
+> **Status:** proposed 2026-10-08, after the owner chose this direction over housekeeping only or a pause. Approved the same day ("continue") with the recommended decisions F1–F6. Stage T was pushed on 2026-10-08, and the protocol is frozen (14:55 UTC). Stage V is pushed, and Dependabot #11 and #13 are merged. Stage U was pushed on 2026-10-08. Only Stage X, gated on data, remains. Stages keep §7's review-stop discipline.
 > **Inputs:**
 > - the Stage S study runs of 2026-10-03 and 2026-10-07 (`docs/edge-study.md`);
 > - the live collector's first hours: 18,310 bars (0.21 days) on 2026-10-07, one bar a second while it runs;
@@ -1600,3 +1600,36 @@ Stage letters continue from Phase 4, skipping O (as I was skipped).
   - e2e from the merged tree: **39 of 39** in 10.7 min, the Windows visual baselines included, so the icon and React bumps move nothing on screen.
 - **The owner's call.** Both are ready to merge, and a merge to `main` deploys. #13 carries the larger change (SQLAlchemy 2.1), which its own CI run #21 and this local run both passed.
 - **Stale Dependabot branches.** These were reported as 11 branches of closed PRs, but that came from out-of-date local tracking refs. On `origin` they had already been removed when their PRs closed. `git fetch --prune` cleared the local copies, so there was nothing to delete.
+
+**Merges and Stage U (2026-10-08).**
+
+- **Merged at the owner's word:** Dependabot #13 (`00f19a0`) and #11 (`5db36bb`), as merge commits on the Stage V notes (`c1fc6f8`).
+  - The merged tree is byte-identical to the trees Stage V tested: `backend/` matches #13's verified tree, `frontend/` matches #11's.
+  - GitHub marked both PRs merged, and Dependabot removed their branches. CI #24 was all green.
+  - The dev venv and `node_modules` were brought to the new pins. The collector was stopped for about a minute so the venv could be updated, then restarted on the new versions.
+  - There was nothing else to delete: the 11 "stale branches" were out-of-date local tracking refs (see Stage V).
+- **Stage U — the edge study in the product.** W4.
+  - **`GET /api/v1/analytics/edge-study`** returns two parts:
+    - `study`: the latest report on this host, which `ml_study.py` now also writes as JSON (`EDGE_STUDY_FILE`: `data/edge-study.json` for live, a file per source otherwise, `/var/data` on Render). A report the server can't read counts as none, and is logged.
+    - `collection`: bars stored, bars and days since the freeze, the oldest and newest bar, the newest bar's age, and retention. The counts are cached for 30 s; the newest bar is read fresh on every request, so its age never lags.
+  - **An index for it** (migration `b7d2f05c1e94`, `ix_market_symbol_source_ts`).
+    - Counting one source's bars scanned the whole table: the (symbol, timestamp) index can't serve the source filter.
+    - Measured on a copy of the live database (36,178 bars): 27.7 ms as a scan, 7.0 ms on the new covering index. The scan grows with the table, to seconds at 60 days.
+  - **Intelligence: an "Edge study" panel.**
+    - A progress ring toward 7 days of bars from the freeze on, with the stored bars, the newest bar's age and retention.
+    - The verdict as a badge and a sentence, and tiles for the best development edge, the holdout against the better prior, the data and the rule.
+    - The best eight configurations, with their spread.
+    - A host with no study says so, and names the commands.
+  - **Settings → Engine: "Data collection"**, a fourth column: bars stored, days of bars, days since the freeze, the newest bar (flagged past 60 s) and retention.
+  - e2e pins its own study file (`EDGE_STUDY_FILE`, never written), so a developer's study can't leak into a run.
+  - **Checks:**
+    - Backend: ruff, ruff format and mypy clean. pytest: 173 passed and 1 skipped, coverage 93.23 % (17.7 min, sharing the CPU with a study run). pip-audit clean. OpenAPI regenerated: 39 paths, 98 schemas.
+    - New API test: no report, then a report written by `report_dict` and validated by the schema, then an unreadable file. It also checks bars counted on both sides of the freeze.
+    - Frontend: Prettier, tsc, eslint, Vitest 32 (3 new: the report's verdict, tiles, holdout against the better prior, rows and spread), the build, and npm audit of what ships.
+    - Playwright: 37 of 39, then the two intended intelligence baselines re-recorded. The diff showed the new panel, inserted in its loading state, and two earlier subtitle changes the pixel tolerance had absorbed. The visual spec then passed 24 of 24 with `--repeat-each=2`, and axe was clean on every route.
+    - Browser, live collector (`frontend-live` on :8001, with the regenerated report):
+      - The panel shows the protocol digest, 75 configurations and the "exploratory" badge.
+      - The ring reads 0.18 of 7 days since the freeze, beside 39,380 live bars stored, kept 60 days.
+      - Then the verdict, the tiles (+0.015 in development, 2 of 4 quarters; holdout +0.040, log-loss 0.622 vs 0.662) and eight rows with their spread.
+      - At 390 px the page is 390 wide and nothing is truncated; the table scrolls in its wrapper. The no-study state checked the same way, on the synthetic backend.
+    - The regenerated `docs/edge-study.md` is byte-identical to Stage T's. The migration applied on the live database at the collector's restart.

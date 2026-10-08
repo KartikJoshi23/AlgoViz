@@ -7,8 +7,8 @@ import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react
 import { Badge, Button, Divider, Field, Input, Panel, SegmentedControl, Select, Switch } from "@/components/ds";
 import { MetricTile, PageHeader } from "@/components/ui/PageHeader";
 import { API_URL, WS_URL, readAdminToken, subscribeAdminToken, writeAdminToken } from "@/lib/api/client";
-import { useAccess, useHealth, useSystemMetrics } from "@/lib/api/hooks";
-import { fmtAgo } from "@/lib/format";
+import { useAccess, useEdgeStudy, useHealth, useSystemMetrics } from "@/lib/api/hooks";
+import { fmtAgo, fmtDuration } from "@/lib/format";
 import { useConnection, useEffectiveMotion, useEffectiveTier, useStore, type MotionPref, type PerfTier } from "@/lib/store";
 import { useNow } from "@/lib/useNow";
 
@@ -83,6 +83,7 @@ export default function SettingsPage() {
   const sym = m?.market?.symbols?.[conn.symbol];
   const resyncs = sym?.book?.resyncs ?? 0;
   const failedFlushes = m?.market?.writer?.failed_flushes ?? 0;
+  const collection = useEdgeStudy(conn.symbol).data?.collection;
 
   return (
     <div className="space-y-3">
@@ -256,7 +257,7 @@ export default function SettingsPage() {
                   />
                   <MetricTile label="resyncs" value={resyncs} hint={sym.book?.state} />
                 </div>
-                <div className="mt-4 grid gap-x-8 gap-y-3 md:grid-cols-3">
+                <div className="mt-4 grid gap-x-8 gap-y-3 md:grid-cols-2 xl:grid-cols-4">
                   <div>
                     <h3 className="col-head mb-1">Book</h3>
                     <dl>
@@ -292,6 +293,22 @@ export default function SettingsPage() {
                         {m?.market?.alerts?.discord?.enabled ? `on · ${m.market.alerts.discord.sent ?? 0} sent` : "not configured"}
                       </KV>
                       <KV k="WebSocket clients">{`${m?.ws?.clients ?? 0} · ${m?.ws?.total_sent?.toLocaleString() ?? 0} frames`}</KV>
+                    </dl>
+                  </div>
+                  <div>
+                    <h3 className="col-head mb-1">Data collection</h3>
+                    <dl>
+                      <KV k="Bars stored">{collection ? `${collection.bars.toLocaleString()} ${collection.source}` : "—"}</KV>
+                      <KV k="Days of bars">{collection ? collection.days.toFixed(2) : "—"}</KV>
+                      <KV k="Since the freeze">
+                        {collection ? `${collection.days_since_freeze.toFixed(2)} of ${collection.days_required} days` : "—"}
+                      </KV>
+                      <KV k="Newest bar">
+                        <Status tone={collection?.newest_age_s != null && collection.newest_age_s > 60 ? "warning" : undefined}>
+                          {collection?.newest_age_s != null ? `${fmtDuration(collection.newest_age_s)} ago` : "—"}
+                        </Status>
+                      </KV>
+                      <KV k="Kept">{collection ? `${collection.retention_days} days` : "—"}</KV>
                     </dl>
                   </div>
                 </div>

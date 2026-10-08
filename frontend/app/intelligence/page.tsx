@@ -2,6 +2,7 @@
 
 import { Badge } from "@/components/ds";
 import { DriftPanel } from "@/components/intelligence/DriftPanel";
+import { EdgeStudyPanel } from "@/components/intelligence/EdgeStudyPanel";
 import { ImportancePanel, ShapPanel } from "@/components/intelligence/ExplainPanels";
 import { RegistryPanel, SignalRulesPanel } from "@/components/intelligence/RegistryPanels";
 import { ReliabilityPanel } from "@/components/intelligence/ReliabilityPanel";
@@ -57,6 +58,8 @@ export default function IntelligencePage() {
           <RegistryPanel symbol={conn.symbol} />
         </div>
       </div>
+
+      <EdgeStudyPanel symbol={conn.symbol} />
 
       <div className="grid gap-3 lg:grid-cols-2">
         <ShapPanel symbol={conn.symbol} />

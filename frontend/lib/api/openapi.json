@@ -1466,6 +1466,97 @@
         "title": "BookStats",
         "type": "object"
       },
+      "CollectionProgress": {
+        "description": "The persisted bars that feed the study, and how far toward the deciding run they are.",
+        "properties": {
+          "bars": {
+            "title": "Bars",
+            "type": "integer"
+          },
+          "bars_since_freeze": {
+            "title": "Bars Since Freeze",
+            "type": "integer"
+          },
+          "days": {
+            "description": "Days of bars (bars / 86,400), not calendar span",
+            "title": "Days",
+            "type": "number"
+          },
+          "days_required": {
+            "title": "Days Required",
+            "type": "number"
+          },
+          "days_since_freeze": {
+            "title": "Days Since Freeze",
+            "type": "number"
+          },
+          "freeze_ms": {
+            "title": "Freeze Ms",
+            "type": "integer"
+          },
+          "newest_age_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Newest Age S"
+          },
+          "newest_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Newest Ms"
+          },
+          "oldest_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Ms"
+          },
+          "retention_days": {
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "source",
+          "bars",
+          "days",
+          "bars_since_freeze",
+          "days_since_freeze",
+          "days_required",
+          "freeze_ms",
+          "oldest_ms",
+          "newest_ms",
+          "newest_age_s",
+          "retention_days"
+        ],
+        "title": "CollectionProgress",
+        "type": "object"
+      },
       "DepthProfile": {
         "description": "Cumulative depth per bin from mid outward (see `LocalOrderBook.depth_profile`).",
         "properties": {
@@ -1775,6 +1866,352 @@
           "total_resolved"
         ],
         "title": "DriftSummary",
+        "type": "object"
+      },
+      "EdgeStudyConfig": {
+        "description": "One configuration of the edge study: a label definition, features and training window.",
+        "properties": {
+          "barrier_k": {
+            "title": "Barrier K",
+            "type": "number"
+          },
+          "edge": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mean edge over the better prior, across quarters",
+            "title": "Edge"
+          },
+          "edge_sd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edge Sd"
+          },
+          "edge_vs_prior": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edge Vs Prior"
+          },
+          "edge_vs_trailing_prior": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edge Vs Trailing Prior"
+          },
+          "features": {
+            "title": "Features",
+            "type": "string"
+          },
+          "flat_share": {
+            "title": "Flat Share",
+            "type": "number"
+          },
+          "floor_bps": {
+            "title": "Floor Bps",
+            "type": "number"
+          },
+          "horizon_s": {
+            "title": "Horizon S",
+            "type": "integer"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "quarters": {
+            "title": "Quarters",
+            "type": "integer"
+          },
+          "quarters_beating": {
+            "title": "Quarters Beating",
+            "type": "integer"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          },
+          "training": {
+            "title": "Training",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "horizon_s",
+          "barrier_k",
+          "floor_bps",
+          "features",
+          "training",
+          "samples",
+          "flat_share",
+          "edge_vs_prior",
+          "edge_vs_trailing_prior",
+          "edge",
+          "edge_sd",
+          "quarters_beating",
+          "quarters"
+        ],
+        "title": "EdgeStudyConfig",
+        "type": "object"
+      },
+      "EdgeStudyData": {
+        "properties": {
+          "bars": {
+            "title": "Bars",
+            "type": "integer"
+          },
+          "days": {
+            "title": "Days",
+            "type": "number"
+          },
+          "first_ms": {
+            "title": "First Ms",
+            "type": "integer"
+          },
+          "last_ms": {
+            "title": "Last Ms",
+            "type": "integer"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          },
+          "sessions": {
+            "title": "Sessions",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "bars",
+          "days",
+          "sessions",
+          "first_ms",
+          "last_ms",
+          "samples"
+        ],
+        "title": "EdgeStudyData",
+        "type": "object"
+      },
+      "EdgeStudyHoldout": {
+        "properties": {
+          "edge": {
+            "title": "Edge",
+            "type": "number"
+          },
+          "log_loss": {
+            "title": "Log Loss",
+            "type": "number"
+          },
+          "prior_log_loss": {
+            "title": "Prior Log Loss",
+            "type": "number"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          },
+          "trailing_prior_log_loss": {
+            "title": "Trailing Prior Log Loss",
+            "type": "number"
+          }
+        },
+        "required": [
+          "samples",
+          "log_loss",
+          "prior_log_loss",
+          "trailing_prior_log_loss",
+          "edge"
+        ],
+        "title": "EdgeStudyHoldout",
+        "type": "object"
+      },
+      "EdgeStudyReport": {
+        "description": "The latest report of `scripts/ml_study.py` on this host.",
+        "properties": {
+          "best": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EdgeStudyConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "configurations": {
+            "title": "Configurations",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EdgeStudyData"
+          },
+          "deciding": {
+            "title": "Deciding",
+            "type": "boolean"
+          },
+          "freeze_ms": {
+            "title": "Freeze Ms",
+            "type": "integer"
+          },
+          "generated_ms": {
+            "title": "Generated Ms",
+            "type": "integer"
+          },
+          "holdout": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EdgeStudyHoldout"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "protocol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Digest of docs/edge-study-protocol.md",
+            "title": "Protocol"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/EdgeStudyRule"
+          },
+          "top": {
+            "items": {
+              "$ref": "#/components/schemas/EdgeStudyConfig"
+            },
+            "title": "Top",
+            "type": "array"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/EdgeStudyVerdict"
+          }
+        },
+        "required": [
+          "generated_ms",
+          "protocol",
+          "freeze_ms",
+          "deciding",
+          "data",
+          "rule",
+          "verdict",
+          "best",
+          "holdout",
+          "configurations",
+          "top"
+        ],
+        "title": "EdgeStudyReport",
+        "type": "object"
+      },
+      "EdgeStudyResponse": {
+        "properties": {
+          "collection": {
+            "$ref": "#/components/schemas/CollectionProgress"
+          },
+          "study": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EdgeStudyReport"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "None when no study has run on this host"
+          }
+        },
+        "required": [
+          "study",
+          "collection"
+        ],
+        "title": "EdgeStudyResponse",
+        "type": "object"
+      },
+      "EdgeStudyRule": {
+        "properties": {
+          "block": {
+            "title": "Block",
+            "type": "integer"
+          },
+          "blocks_per_quarter": {
+            "title": "Blocks Per Quarter",
+            "type": "integer"
+          },
+          "min_days": {
+            "title": "Min Days",
+            "type": "number"
+          },
+          "min_quarters_beating": {
+            "title": "Min Quarters Beating",
+            "type": "integer"
+          },
+          "quarters": {
+            "title": "Quarters",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "min_quarters_beating",
+          "quarters",
+          "min_days",
+          "block",
+          "blocks_per_quarter"
+        ],
+        "title": "EdgeStudyRule",
+        "type": "object"
+      },
+      "EdgeStudyVerdict": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "exploratory",
+              "preliminary",
+              "too_few",
+              "no_holdout",
+              "no_edge",
+              "adopt"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "reason"
+        ],
+        "title": "EdgeStudyVerdict",
         "type": "object"
       },
       "ErrorMessage": {
@@ -5816,6 +6253,68 @@
           }
         },
         "summary": "Realised-outcome drift monitor",
+        "tags": [
+          "Analytics"
+        ]
+      }
+    },
+    "/api/v1/analytics/edge-study": {
+      "get": {
+        "operationId": "get_edge_study_api_v1_analytics_edge_study_get",
+        "parameters": [
+          {
+            "description": "Symbol; defaults to the primary symbol",
+            "in": "query",
+            "name": "symbol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 20,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Symbol; defaults to the primary symbol",
+              "title": "Symbol"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EdgeStudyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "The latest edge study on this host, and how far data collection has come",
         "tags": [
           "Analytics"
         ]

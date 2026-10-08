@@ -48,6 +48,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from itertools import pairwise
 from pathlib import Path
+from typing import Any, Literal
 
 import numpy as np
 
@@ -405,32 +406,40 @@ def holdout(
     return Score.pool(scored) if scored else None
 
 
+VerdictKind = Literal["exploratory", "preliminary", "too_few", "no_holdout", "no_edge", "adopt"]
+
+
 @dataclass(frozen=True, slots=True)
 class Verdict:
-    adopt: bool
+    kind: VerdictKind
     reason: str
+
+    @property
+    def adopt(self) -> bool:
+        return self.kind == "adopt"
 
 
 def decide(best: ConfigResult, held: Score | None, days: float, *, deciding: bool) -> Verdict:
     """The pre-registered rule."""
     if not deciding:
         return Verdict(
-            False, "exploratory: bars from before the protocol was frozen; nothing is decided"
+            "exploratory",
+            "exploratory: bars from before the protocol was frozen; nothing is decided",
         )
     if days < MIN_DAYS:
         return Verdict(
-            False,
+            "preliminary",
             f"preliminary: {days:.2f} days of bars, the rule needs {MIN_DAYS:g}; nothing is decided",
         )
     if held is None:
-        return Verdict(False, "no holdout to score; nothing is decided")
+        return Verdict("no_holdout", "no holdout to score; nothing is decided")
     summary = (
         f"{best.name} beat both priors in {best.beating} of {len(best.quarters)} development "
         f"quarters, and the better prior by {held.edge:+.4f} nats on the holdout"
     )
     if best.beating >= MIN_QUARTERS_BEATING and held.edge > 0:
-        return Verdict(True, f"adopt: {summary}")
-    return Verdict(False, f"no edge: {summary}")
+        return Verdict("adopt", f"adopt: {summary}")
+    return Verdict("no_edge", f"no edge: {summary}")
 
 
 @dataclass(slots=True)
@@ -483,7 +492,7 @@ def run_study(
                 run(r.spec, variant=variant)
     scored = [r for r in results if r.quarters]
     if not scored:
-        verdict = Verdict(False, "too few labelled samples for any configuration")
+        verdict = Verdict("too_few", "too few labelled samples for any configuration")
         return StudyReport(samples, results, None, None, verdict, deciding, protocol)
     best = max(scored, key=lambda r: r.mean_edge)
     held = holdout(samples, best, **limits)
@@ -544,3 +553,66 @@ def render(report: StudyReport) -> str:
             f"{r.beating} of {len(r.quarters)} |"
         )
     return "\n".join(lines) + "\n"
+
+
+def report_dict(report: StudyReport, *, generated_ms: int, top: int = 12) -> dict[str, Any]:
+    """The report as JSON for the API (`EdgeStudyReport`): the verdict, the holdout, the best configurations."""
+    s = report.samples
+
+    def config(r: ConfigResult) -> dict[str, Any]:
+        scored = bool(r.quarters)
+        return {
+            "label": str(r.spec),
+            "horizon_s": r.spec.horizon_s,
+            "barrier_k": r.spec.barrier_k,
+            "floor_bps": r.spec.floor_bps,
+            "features": r.ablation,
+            "training": r.variant.name,
+            "samples": r.n,
+            "flat_share": round(r.flat_share, 4),
+            "edge_vs_prior": round(r.mean_edge_vs_prior, 5) if scored else None,
+            "edge_vs_trailing_prior": round(r.mean_edge_vs_trailing, 5) if scored else None,
+            "edge": round(r.mean_edge, 5) if scored else None,
+            "edge_sd": round(float(np.std(r.edges)), 5) if scored else None,
+            "quarters_beating": r.beating,
+            "quarters": len(r.quarters),
+        }
+
+    h = report.holdout
+    ranked = sorted(
+        (r for r in report.results if r.quarters), key=lambda r: r.mean_edge, reverse=True
+    )
+    return {
+        "generated_ms": generated_ms,
+        "protocol": report.protocol,
+        "freeze_ms": FREEZE_MS,
+        "deciding": report.deciding,
+        "data": {
+            "bars": s.n_bars,
+            "days": round(s.days, 4),
+            "sessions": s.sessions,
+            "first_ms": s.span_ms[0],
+            "last_ms": s.span_ms[1],
+            "samples": len(s.rows),
+        },
+        "rule": {
+            "min_quarters_beating": MIN_QUARTERS_BEATING,
+            "quarters": QUARTERS,
+            "min_days": MIN_DAYS,
+            "block": BLOCK,
+            "blocks_per_quarter": BLOCKS_PER_QUARTER,
+        },
+        "verdict": {"kind": report.verdict.kind, "reason": report.verdict.reason},
+        "best": None if report.best is None else config(report.best),
+        "holdout": None
+        if h is None
+        else {
+            "samples": h.n_test,
+            "log_loss": round(h.log_loss, 5),
+            "prior_log_loss": round(h.prior_log_loss, 5),
+            "trailing_prior_log_loss": round(h.trailing_prior_log_loss, 5),
+            "edge": round(h.edge, 5),
+        },
+        "configurations": len(report.results),
+        "top": [config(r) for r in ranked[:top]],
+    }

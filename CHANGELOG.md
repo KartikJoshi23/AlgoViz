@@ -5,6 +5,16 @@ Notable changes, newest first. The format follows
 
 ## [Unreleased] — Phase 6: make the edge question answerable
 
+### The edge study in the product (Stage U)
+- **Intelligence: an "Edge study" panel.** It shows progress toward 7 days of bars from the freeze on, the verdict of the latest study on this host, the rule, the protocol's digest, the best configurations, and the holdout against the better prior. A host where no study has run says so.
+- **Settings → Engine: "Data collection".** Bars stored, days of bars, days since the freeze, the newest bar's age and retention.
+- **`GET /api/v1/analytics/edge-study`.** It serves the latest report, which `scripts/ml_study.py` now also writes as JSON (`EDGE_STUDY_FILE`, on Render's disk), plus collection progress. The counts are cached for 30 s; the newest bar is read fresh on every request.
+
+### Dependencies
+- Dependabot #13: SQLAlchemy 2.1.3, FastAPI 0.142.2, uvicorn 0.54, websockets 17.2, PyJWT 2.15.1.
+- Dependabot #11: React 19.3, three 0.186.1, Vitest 5.0.2, React Query 5.104, lucide-react 1.48.
+- Both were verified against `main` (gates and e2e) before merging.
+
 ### The edge study, as served (Stage T)
 - **Evaluated as served.** The study refits the served recipe every 600 samples, as the engine does, instead of training one model per fold. It uses 8 blocks in each development quarter and every block of the holdout, and each training window ends one horizon before its block. The rule reads quarters: at least 3 of 4, and the holdout.
 - **Training variants, fixed in advance.** 1 h and 4 h windows, and recency weights with a 1 h half-life, run on the three best label definitions alongside the feature ablations.

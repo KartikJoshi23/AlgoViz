@@ -169,6 +169,8 @@ class Settings(BaseSettings):
     SNAPSHOT_RETENTION_DAYS: int = 7
     PREDICTION_RETENTION_DAYS: int = 7
     ALERT_HISTORY_RETENTION_DAYS: int = 30
+    # The latest edge-study report (`scripts/ml_study.py`), which the API serves.
+    EDGE_STUDY_FILE: Path = DATA_DIR / "edge-study.json"
 
     # ── Health ───────────────────────────────────────────────────────
     LOOP_LAG_DEGRADED_MS: float = 250.0  # event-loop lag p99 above this ⇒ not ready
@@ -224,6 +226,8 @@ class Settings(BaseSettings):
                 )
             if self.ML_MODEL_DIR == fields["ML_MODEL_DIR"].default:
                 self.ML_MODEL_DIR = self.ML_MODEL_DIR / self.DATA_SOURCE
+            if self.EDGE_STUDY_FILE == fields["EDGE_STUDY_FILE"].default:
+                self.EDGE_STUDY_FILE = DATA_DIR / f"edge-study-{self.DATA_SOURCE}.json"
         self.ML_MODEL_DIR.mkdir(parents=True, exist_ok=True)
         return self
 

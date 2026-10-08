@@ -49,6 +49,9 @@ services:
       # Bars are the edge study's data set (implementation-plan §11, W5).
       - key: SNAPSHOT_RETENTION_DAYS
         value: "60"
+      # The latest edge-study report (scripts/ml_study.py) lives on the disk with the bars.
+      - key: EDGE_STUDY_FILE
+        value: /var/data/edge-study.json
       # os.cpu_count() reports the host's cores, not the instance's one CPU.
       - key: ML_TRAIN_THREADS
         value: "1"

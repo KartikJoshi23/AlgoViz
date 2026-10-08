@@ -24,12 +24,12 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any, Protocol
 
-from sqlalchemy import delete, select, text
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from algoviz.core.time import from_ms, utcnow
+from algoviz.core.time import from_ms, to_ms, utcnow
 from algoviz.market.bars import Bar
 from algoviz.models import AlertHistory, MarketSnapshot, Prediction
 
@@ -295,16 +295,40 @@ async def iter_bars(
         after_ms = page[-1].ts_ms + 1
 
 
-async def count_bars(
-    session_factory: async_sessionmaker[AsyncSession], symbol: str, source: str | None = None
-) -> int:
-    from sqlalchemy import func
-
-    q = select(func.count()).select_from(MarketSnapshot).where(MarketSnapshot.symbol == symbol)
-    if source is not None:
-        q = q.where(MarketSnapshot.source == source)
+async def bar_coverage(
+    session_factory: async_sessionmaker[AsyncSession], symbol: str, source: str, since_ms: int
+) -> tuple[int, int, int | None, int | None]:
+    """
+    Persisted bars of `symbol` from `source`: how many, how many from `since_ms`
+    on, and the oldest and newest open time (ms).
+    """
+    since = from_ms(since_ms)
+    q = select(
+        func.count(),
+        func.count().filter(MarketSnapshot.timestamp >= since),
+        func.min(MarketSnapshot.timestamp),
+        func.max(MarketSnapshot.timestamp),
+    ).where(MarketSnapshot.symbol == symbol, MarketSnapshot.source == source)
     async with session_factory() as session:
-        return int((await session.execute(q)).scalar_one())
+        n, n_since, oldest, newest = (await session.execute(q)).one()
+    return (
+        int(n),
+        int(n_since),
+        None if oldest is None else to_ms(oldest),
+        None if newest is None else to_ms(newest),
+    )
+
+
+async def newest_bar_ms(
+    session_factory: async_sessionmaker[AsyncSession], symbol: str, source: str
+) -> int | None:
+    """The newest persisted bar's open time (ms): a walk down the (symbol, timestamp) index."""
+    q = select(func.max(MarketSnapshot.timestamp)).where(
+        MarketSnapshot.symbol == symbol, MarketSnapshot.source == source
+    )
+    async with session_factory() as session:
+        newest = (await session.execute(q)).scalar_one()
+    return None if newest is None else to_ms(newest)
 
 
 # ── Exports (bars past retention) ─────────────────────────────────

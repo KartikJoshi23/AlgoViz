@@ -123,7 +123,7 @@ Symbols: `SYMBOLS=["BTCUSDT"]` (allowlist: BTCUSDT, ETHUSDT, SOLUSDT). Synthetic
 |---|---|
 | `/` | KPI strip (z-annotated), liquidity heatmap (3D terrain on request), mid/VWAP/microprice chart, model panel, volatility state and trend, cumulative depth, order-flow strips, signals feed, trade tape, session z-scores |
 | `/book` | Full-width liquidity heatmap / terrain with hover readout, cumulative depth curve, ladder, liquidity bands and slopes, OFI / imbalance / spread strips |
-| `/intelligence` | Calibrated probabilities, drift monitor (rolling hit rate and log-loss vs prior), SHAP contributions, held-out permutation importance, walk-forward folds with held-out reliability and the Brier decomposition, model registry, signal rules with live state |
+| `/intelligence` | Calibrated probabilities, drift monitor (rolling hit rate and log-loss vs prior), SHAP contributions, held-out permutation importance, walk-forward folds with held-out reliability and the Brier decomposition, model registry, the edge study's verdict and data-collection progress, signal rules with live state |
 | `/strategies` | Condition editor over the feature catalog, templates, backtest runner with WebSocket progress, equity/drawdown chart, trade list |
 | `/alerts` | Rule CRUD, live + persisted history, acknowledge, Discord |
 | `/settings` | Symbol, book stream, performance tier, motion, ambient tint, connection, access (admin token), engine metrics |
@@ -147,6 +147,7 @@ Interactive docs at `/docs` (Swagger) and `/redoc`. Highlights:
 | `GET` | `/api/v1/market/feature-catalog` | The one list of features the condition language accepts |
 | `GET` | `/api/v1/analytics/prediction` · `/model-info` · `/shap` · `/drift` · `/model-registry` | Model state, walk-forward metrics, explanations, live drift, training history |
 | `GET` | `/api/v1/analytics/signals` · `/signals/rules` | Active signals, recent transitions, rule definitions |
+| `GET` | `/api/v1/analytics/edge-study` | The latest edge-study report on this host, and how far the bars that decide it have come |
 | `CRUD` | `/api/v1/strategies` · `POST …/{id}/backtest` · `GET …/{id}/backtests/{bid}` | Strategies, asynchronous backtests, results with equity curve and trades |
 | `CRUD` | `/api/v1/alerts/rules` · `/api/v1/alerts/history` | Alert rules and history with acknowledgement |
 | `GET` | `/api/v1/system/metrics` · `/metrics` | Engine, writer, alert evaluator and WebSocket statistics (JSON for the UI; Prometheus text for scrapers) |

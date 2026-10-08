@@ -15,6 +15,7 @@ test("preferences persist across reloads and the engine metrics load", async ({ 
   const engine = panel(page, "Engine");
   await expect(engine).toContainText(/events \/ s/i);
   await expect(engine).toContainText("synced");
+  await expect(engine).toContainText(/Bars stored\s*[\d,]+ synthetic/);
   await expect(panel(page, "Connection")).toContainText("open");
 
   // back to defaults for the next spec
@@ -38,6 +39,11 @@ test("intelligence page: model panels populate", async ({ page }) => {
   await expect(folds.locator("tbody tr")).toHaveCount(4);
   await expect(folds).toContainText("isotonic");
   await expect(panel(page, "Reliability")).toContainText(/walk-forward folds · \d+ held-out forecasts/);
+  // no edge study has run on the e2e host: the panel says so, and counts the bars collected
+  const study = panel(page, "Edge study");
+  await expect(study).toContainText("No study has run on this host yet");
+  await expect(study).toContainText(/[\d,]+ synthetic bars stored/);
+  await expect(study.getByRole("progressbar", { name: "Days of deciding bars collected" })).toBeVisible();
   const rules = panel(page, "Signal rules");
   await expect(rules).toContainText(/\d+ rules on z-scores/);
   await expect(rules.locator(".row").first()).toBeVisible();

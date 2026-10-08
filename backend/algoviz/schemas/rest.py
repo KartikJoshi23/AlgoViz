@@ -390,6 +390,93 @@ class DriftResponse(BaseModel):
     series: list[DriftOutcome]
 
 
+class EdgeStudyConfig(BaseModel):
+    """One configuration of the edge study: a label definition, features and training window."""
+
+    label: str
+    horizon_s: int
+    barrier_k: float
+    floor_bps: float
+    features: str
+    training: str
+    samples: int
+    flat_share: float
+    edge_vs_prior: float | None
+    edge_vs_trailing_prior: float | None
+    edge: float | None = Field(description="Mean edge over the better prior, across quarters")
+    edge_sd: float | None
+    quarters_beating: int
+    quarters: int
+
+
+class EdgeStudyHoldout(BaseModel):
+    samples: int
+    log_loss: float
+    prior_log_loss: float
+    trailing_prior_log_loss: float
+    edge: float
+
+
+class EdgeStudyData(BaseModel):
+    bars: int
+    days: float
+    sessions: int
+    first_ms: int
+    last_ms: int
+    samples: int
+
+
+class EdgeStudyRule(BaseModel):
+    min_quarters_beating: int
+    quarters: int
+    min_days: float
+    block: int
+    blocks_per_quarter: int
+
+
+class EdgeStudyVerdict(BaseModel):
+    kind: Literal["exploratory", "preliminary", "too_few", "no_holdout", "no_edge", "adopt"]
+    reason: str
+
+
+class EdgeStudyReport(BaseModel):
+    """The latest report of `scripts/ml_study.py` on this host."""
+
+    generated_ms: int
+    protocol: str | None = Field(description="Digest of docs/edge-study-protocol.md")
+    freeze_ms: int
+    deciding: bool
+    data: EdgeStudyData
+    rule: EdgeStudyRule
+    verdict: EdgeStudyVerdict
+    best: EdgeStudyConfig | None
+    holdout: EdgeStudyHoldout | None
+    configurations: int
+    top: list[EdgeStudyConfig]
+
+
+class CollectionProgress(BaseModel):
+    """The persisted bars that feed the study, and how far toward the deciding run they are."""
+
+    symbol: str
+    source: str
+    bars: int
+    days: float = Field(description="Days of bars (bars / 86,400), not calendar span")
+    bars_since_freeze: int
+    days_since_freeze: float
+    days_required: float
+    freeze_ms: int
+    oldest_ms: int | None
+    newest_ms: int | None
+    newest_age_s: float | None
+    retention_days: int
+
+
+class EdgeStudyResponse(BaseModel):
+    study: EdgeStudyReport | None = Field(description="None when no study has run on this host")
+    collection: CollectionProgress
+
+
 class ShapContribution(BaseModel):
     feature: str
     value: float

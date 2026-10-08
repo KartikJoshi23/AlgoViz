@@ -24,6 +24,7 @@ export type ModelInfo = S["ModelInfoResponse"];
 export type ModelRegistryEntry = S["ModelRegistryEntry"];
 export type ShapResponse = S["ShapResponse"];
 export type DriftResponse = S["DriftResponse"];
+export type EdgeStudy = S["EdgeStudyResponse"];
 export type SignalRule = S["SignalRuleResponse"];
 export type HealthResponse = S["HealthResponse"];
 export type BacktestTrade = S["BacktestTrade"];
@@ -170,6 +171,14 @@ export const useDrift = (symbol: string | null) =>
         }),
       ),
     refetchInterval: 10_000,
+  });
+
+/** The latest edge study on this host, and how far the bars that decide it have come. */
+export const useEdgeStudy = (symbol: string | null) =>
+  useQuery({
+    queryKey: ["edge-study", symbol],
+    queryFn: async () => unwrap(await api.GET("/api/v1/analytics/edge-study", { params: { query: symbol ? { symbol } : {} } })),
+    refetchInterval: 60_000, // bars accrue at one a second; the study changes when someone runs it
   });
 
 /** Active signals plus the engine's recent transitions — the history the live feed extends. */

@@ -36,9 +36,11 @@ These rules come from the owner and still apply:
     - E9 and the live collector were pushed as `b2e3404`; CI #22 was all green.
 - **Phase 6** (`docs/implementation-plan.md` §12, "make the edge question answerable, and visible") was **approved 2026-10-08** with the recommended decisions F1–F6. The order is T → V → U → X.
   - **Stage T** (the study, as served) was pushed 2026-10-08 (`e421d27`); CI #23 was all green.
-  - **Stage V** is delivered in the working tree: Dependabot #11 and #13 each pass the full gates and e2e (39/39) merged onto `main`. Merging them is the owner's call. Next is Stage U (the edge study in the product).
+  - **Stage V** (`c1fc6f8`) verified Dependabot #11 and #13 against `main`. The owner had them merged (`00f19a0`, `5db36bb`); CI #24 was all green.
+  - **Stage U** (the edge study in the product) was pushed 2026-10-08. It covers `GET /api/v1/analytics/edge-study`, the Intelligence "Edge study" panel, Settings → Engine "Data collection", and the index migration `b7d2f05c1e94`.
+  - **Next is Stage X,** the deciding run, gated on data: `scripts/ml_study.py --decide` once 7 days of bars from the freeze on exist. Every run also writes `EDGE_STUDY_FILE` (live: `backend/data/edge-study.json`), which the panel shows.
   - **The protocol is frozen** at 2026-10-08 14:55 UTC (`docs/edge-study-protocol.md`, `study.FREEZE_MS`). Never examine bars from the freeze on, except through `ml_study.py --decide`, which refuses until 7 days of them exist. A change to the protocol after the freeze must be logged in its "Changes" section.
-  - **Pushed 2026-10-07:** the fix for Dependabot PR #12's failing install (`constraints.txt` no longer pins `pydantic-core`; plan §11.5). Dependabot replaced #12 with #13 (9 updates, including SQLAlchemy 2.1.3 and FastAPI 0.142.2); CI #21 on it was all green, and Stage V verified it against `main`. Merging it waits on the owner's word.
+  - **Pushed 2026-10-07:** the fix for Dependabot PR #12's failing install (`constraints.txt` no longer pins `pydantic-core`; plan §11.5). Dependabot replaced #12 with #13 (9 updates, including SQLAlchemy 2.1.3 and FastAPI 0.142.2); CI #21 on it was all green, Stage V verified it against `main`, and it was merged on 2026-10-08.
   - The owner's cutover steps are listed at the end of that entry: the push, the Render Blueprint, the Vercel environment variables.
   - After the cutover, verify with `python backend/scripts/smoke_deploy.py https://<backend>`. Only the owner runs it `--with-token`: the token never passes through Claude.
 - **Git:** the whole rebuild (Phases 3 and 4) is on `main`, pushed 2026-10-01 at the owner's request as a fast-forward. `overhaul/phase-3-4` is the merged branch and can be deleted.
@@ -88,10 +90,10 @@ These rules come from the owner and still apply:
 
 - **Backend** (in `backend/`):
   - `ruff check .`, `ruff format --check .`, `mypy`
-  - `pytest -q --cov` — 173 tests (one is POSIX-only, so 172 pass and 1 skips on Windows), coverage floor 90 % (92.76 % now)
+  - `pytest -q --cov` — 174 tests (one is POSIX-only, so 173 pass and 1 skips on Windows), coverage floor 90 % (93.23 % now)
   - `pip-audit -r requirements.txt -r constraints.txt --strict`
   - OpenAPI freshness
-- **Frontend** (in `frontend/`): `npm run format:check`, `npm run check` (tsc · eslint · vitest 29 · next build), `npm audit --omit=dev --audit-level=high`.
+- **Frontend** (in `frontend/`): `npm run format:check`, `npm run check` (tsc · eslint · vitest 32 · next build), `npm audit --omit=dev --audit-level=high`.
   - The full `npm audit --audit-level=high` runs too, reported but not blocking. braces ≤ 3.0.3 (dev only, via eslint-config-next) has a high advisory and no patched release; the owner chose this scope on 2026-10-07. Make it blocking again once braces ships a fix.
 - **E2E:** `npx playwright test` — 38 tests, plus the toast-stacking test; about 10–13 min on SwiftShader.
   - Projects: `chromium` and `webgl-mid`.

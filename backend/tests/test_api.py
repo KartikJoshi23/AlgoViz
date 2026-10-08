@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import uuid
+from pathlib import Path
 
+import numpy as np
+import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
@@ -182,6 +186,76 @@ async def test_model_info_contract(client: AsyncClient) -> None:
         and drift["summary"]["status"] == "no_data"
         and drift["series"] == []
     )
+
+
+async def test_edge_study_reports_collection_and_the_latest_study(
+    client: AsyncClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from algoviz.api import analytics
+    from algoviz.config import settings
+    from algoviz.db import async_session
+    from algoviz.market.bars import Bar
+    from algoviz.market.persistence import BarWriter
+    from algoviz.ml.study import (
+        ALL_FEATURES,
+        FREEZE_MS,
+        ConfigResult,
+        LabelSpec,
+        Samples,
+        Score,
+        StudyReport,
+        decide,
+        report_dict,
+    )
+
+    url = "/api/v1/analytics/edge-study"
+    monkeypatch.setattr(settings, "EDGE_STUDY_FILE", tmp_path / "edge-study.json")
+    writer = BarWriter(async_session, retention_days=30)
+    for dt_s in (-2, -1, 0, 1):  # two bars before the freeze, two from it on
+        writer.enqueue(
+            Bar(
+                "BTCUSDT",
+                FREEZE_MS + dt_s * 1000,
+                "synthetic",
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                0.5,
+                1,
+            )
+        )
+    await writer.flush()
+    analytics._coverage.clear()
+
+    data = (await client.get(url)).json()
+    assert data["study"] is None  # no study has run on this host
+    c = data["collection"]
+    assert c["source"] == "synthetic" and c["days_required"] == 7 and c["freeze_ms"] == FREEZE_MS
+    assert c["bars"] >= 4 and c["bars_since_freeze"] >= 2  # the engine adds its own
+    assert c["oldest_ms"] <= FREEZE_MS - 2000 and c["newest_age_s"] is not None
+    assert c["retention_days"] == settings.SNAPSHOT_RETENTION_DAYS
+
+    spec = LabelSpec(5, 1.0, 0.5)
+    quarters = [Score(600, 0.60, 0.65, 0.64)] * 4
+    best = ConfigResult(spec, ALL_FEATURES, 9000, 0.8, quarters)
+    held = Score(1200, 0.61, 0.66, 0.63)
+    samples = Samples(
+        np.zeros((2, 3)), np.arange(2), np.arange(2), [1.0, 1.0], [None, None], np.full(2, 2), 2, 1,
+        (FREEZE_MS - 2000, FREEZE_MS - 1000),
+    )  # fmt: skip
+    verdict = decide(best, held, samples.days, deciding=False)
+    report = StudyReport(samples, [best], best, held, verdict, False, "b0d882428954f5df")
+    settings.EDGE_STUDY_FILE.write_text(json.dumps(report_dict(report, generated_ms=FREEZE_MS)))
+    study = (await client.get(url)).json()["study"]
+    assert study["verdict"]["kind"] == "exploratory" and not study["deciding"]
+    assert study["best"]["label"] == str(spec) and study["best"]["edge"] == pytest.approx(0.04)
+    assert study["holdout"]["edge"] == pytest.approx(0.02) and study["top"][0] == study["best"]
+
+    settings.EDGE_STUDY_FILE.write_text("{not json")  # a report this server can't read
+    assert (await client.get(url)).json()["study"] is None
 
 
 async def test_signals_endpoints(client: AsyncClient) -> None:

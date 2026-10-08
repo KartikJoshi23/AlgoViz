@@ -8,7 +8,8 @@ Run the edge study (implementation-plan §11 W5, §12; `algoviz/ml/study.py`).
 
 Bars come from the database the server uses for the source and from the export
 files under `--exports` (`scripts/export_bars.py`), one per open time. The
-protocol (`docs/edge-study-protocol.md`) was frozen at `study.FREEZE_MS`.
+protocol (`docs/edge-study-protocol.md`) was frozen at `study.FREEZE_MS`. Each run
+also writes its report as JSON to `EDGE_STUDY_FILE`, which the API serves.
 
 Without `--decide` the study runs on the bars from before the freeze: they shaped
 the protocol, so the run explores and decides nothing. With it, the study runs on
@@ -22,6 +23,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import hashlib
+import json
 import os
 import sys
 import time
@@ -57,6 +59,7 @@ def main() -> int:
         ConfigResult,
         LabelSpec,
         render,
+        report_dict,
         run_study,
         split_at_freeze,
     )
@@ -102,6 +105,11 @@ def main() -> int:
         bars, settings, deciding=args.decide, specs=specs, protocol=protocol, progress=progress
     )
     text = render(report)
+    # The API serves the latest report on this host (GET /api/v1/analytics/edge-study).
+    settings.EDGE_STUDY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    data = report_dict(report, generated_ms=int(time.time() * 1000))
+    settings.EDGE_STUDY_FILE.write_text(json.dumps(data, indent=1), encoding="utf-8")
+    print(f"wrote {settings.EDGE_STUDY_FILE}", file=sys.stderr)
     if args.out is not None:
         args.out.write_text(text, encoding="utf-8", newline="\n")
         print(f"wrote {args.out}", file=sys.stderr)
