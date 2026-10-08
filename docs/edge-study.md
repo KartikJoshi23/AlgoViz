@@ -1,77 +1,88 @@
 # Edge study
 
-- Data: 15,824 bars (0.18 days of bars) in 12 sessions, 2026-09-26 13:17 to 2026-10-07 19:00 UTC; 15,114 samples with a full lookback.
-- Rule, fixed in advance: adopt only if the model beats both the class prior and the trailing prior in at least 3 development folds and on the holdout, with at least 7 days of bars.
-- **Verdict: preliminary: 0.18 days of bars, the rule needs 7; nothing is decided.**
-- Holdout (120 s · k 2 · floor 0.5 bps, all features): 3,370 samples, log-loss 1.3784 vs class prior 0.8396 and trailing prior 1.0262.
+- Data, exploratory (before the freeze): 24,018 bars (0.28 days of bars) in 13 sessions, 2026-09-26 13:17 to 2026-10-08 14:54 UTC; 23,244 samples with a full lookback.
+- Protocol: `docs/edge-study-protocol.md` (sha256 b0d882428954f5df), frozen 2026-10-08 14:55 UTC.
+- Evaluation as served: a refit every 600 samples; 8 blocks in each of 4 development quarters (the earlier 75%); every block of the holdout.
+- Rule, fixed in advance: adopt only if the model beats both the class prior and the trailing prior in at least 3 development quarters and on the holdout, with at least 7 days of bars from the freeze on.
+- **Verdict: exploratory: bars from before the protocol was frozen; nothing is decided.**
+- Holdout (5 s · k 1 · floor 0.5 bps (without hour of day, served window)): 5,806 samples, log-loss 0.6219 vs class prior 0.6735 and trailing prior 0.6620.
 
-Development walk-forward, best first. Edges are log-loss improvements in nats; the trailing prior is the class mix of the labels already resolved at each prediction. The rule's edge is over the better of the two priors, fold by fold.
+Development, best first. Edges are log-loss improvements in nats; the trailing prior is the class mix of the labels already resolved at each prediction. The rule's edge is over the better of the two priors, quarter by quarter.
 
-| Label | Features | Samples | Flat | Edge vs prior | Edge vs trailing prior | Edge vs the better prior | Folds beating both |
-|---|---|--:|--:|--:|--:|--:|--:|
-| 120 s · k 2 · floor 0.5 bps | all features | 13,957 | 71% | +0.0482 | +0.3229 | +0.0482 ± 0.0345 | 4 of 4 |
-| 120 s · k 2 · floor 1 bps | all features | 13,957 | 72% | +0.0396 | +0.2460 | +0.0396 ± 0.0489 | 3 of 4 |
-| 5 s · k 2 · floor 1 bps | without hour of day | 15,114 | 93% | +0.0010 | +0.0019 | -0.0031 ± 0.0191 | 2 of 4 |
-| 5 s · k 2 · floor 1 bps | without scaled quantities | 15,114 | 93% | -0.0084 | -0.0074 | -0.0124 ± 0.0226 | 2 of 4 |
-| 5 s · k 2 · floor 1 bps | all features | 15,114 | 93% | -0.0086 | -0.0076 | -0.0126 ± 0.0212 | 1 of 4 |
-| 5 s · k 2 · floor 0.5 bps | all features | 15,114 | 92% | -0.0118 | -0.0102 | -0.0151 ± 0.0171 | 1 of 4 |
-| 5 s · k 1 · floor 1 bps | all features | 15,114 | 89% | +0.0055 | -0.0196 | -0.0222 ± 0.0595 | 3 of 4 |
-| 120 s · k 2 · floor 2 bps | all features | 13,957 | 74% | -0.0256 | +0.3556 | -0.0256 ± 0.0655 | 2 of 4 |
-| 120 s · k 2 · floor 0.5 bps | without scaled quantities | 13,957 | 71% | -0.0282 | +0.2465 | -0.0282 ± 0.1242 | 2 of 4 |
-| 5 s · k 2 · floor 4 bps | all features | 15,114 | 99% | -0.0203 | -0.0277 | -0.0289 ± 0.0309 | 0 of 4 |
-| 5 s · k 2 · floor 2 bps | all features | 15,114 | 97% | -0.0199 | -0.0261 | -0.0296 ± 0.0346 | 2 of 4 |
-| 120 s · k 2 · floor 4 bps | all features | 13,957 | 80% | -0.0298 | +0.1848 | -0.0298 ± 0.0352 | 1 of 4 |
-| 5 s · k 1 · floor 0.5 bps | all features | 15,114 | 85% | -0.0078 | -0.0297 | -0.0318 ± 0.0642 | 2 of 4 |
-| 120 s · k 2 · floor 1 bps | without scaled quantities | 13,957 | 72% | -0.0444 | +0.1620 | -0.0444 ± 0.1594 | 2 of 4 |
-| 15 s · k 2 · floor 2 bps | all features | 15,004 | 91% | -0.0406 | -0.0238 | -0.0444 ± 0.0604 | 0 of 4 |
-| 15 s · k 2 · floor 4 bps | all features | 15,004 | 97% | -0.0281 | -0.0412 | -0.0446 ± 0.0498 | 0 of 4 |
-| 15 s · k 2 · floor 1 bps | all features | 15,004 | 87% | -0.0423 | -0.0159 | -0.0462 ± 0.0485 | 1 of 4 |
-| 60 s · k 2 · floor 4 bps | all features | 14,552 | 88% | -0.0465 | -0.0167 | -0.0468 ± 0.0616 | 1 of 4 |
-| 5 s · k 0.5 · floor 1 bps | all features | 15,114 | 88% | +0.0022 | -0.0466 | -0.0474 ± 0.1016 | 3 of 4 |
-| 120 s · k 2 · floor 1 bps | without hour of day | 13,957 | 72% | -0.0475 | +0.1589 | -0.0475 ± 0.1344 | 2 of 4 |
-| 5 s · k 0.5 · floor 4 bps | all features | 15,114 | 99% | -0.0310 | -0.0494 | -0.0504 ± 0.0627 | 0 of 4 |
-| 5 s · k 1 · floor 4 bps | all features | 15,114 | 99% | -0.0310 | -0.0494 | -0.0504 ± 0.0627 | 0 of 4 |
-| 5 s · k 1 · floor 2 bps | all features | 15,114 | 96% | -0.0204 | -0.0492 | -0.0526 ± 0.0626 | 1 of 4 |
-| 15 s · k 2 · floor 0.5 bps | all features | 15,004 | 86% | -0.0533 | -0.0267 | -0.0560 ± 0.0558 | 1 of 4 |
-| 30 s · k 2 · floor 1 bps | all features | 14,852 | 82% | -0.0579 | +0.0128 | -0.0579 ± 0.0461 | 0 of 4 |
-| 15 s · k 1 · floor 1 bps | all features | 15,004 | 76% | -0.0367 | -0.0432 | -0.0622 ± 0.0635 | 1 of 4 |
-| 120 s · k 1 · floor 4 bps | all features | 13,957 | 69% | -0.0577 | +0.0561 | -0.0632 ± 0.0904 | 1 of 4 |
-| 30 s · k 1 · floor 2 bps | all features | 14,852 | 75% | -0.0428 | -0.0251 | -0.0646 ± 0.0529 | 1 of 4 |
-| 5 s · k 0.5 · floor 2 bps | all features | 15,114 | 96% | -0.0194 | -0.0620 | -0.0656 ± 0.0799 | 1 of 4 |
-| 30 s · k 2 · floor 0.5 bps | all features | 14,852 | 81% | -0.0671 | +0.0042 | -0.0671 ± 0.0235 | 0 of 4 |
-| 5 s · k 0.5 · floor 0.5 bps | all features | 15,114 | 80% | -0.0104 | -0.0698 | -0.0698 ± 0.1075 | 2 of 4 |
-| 30 s · k 2 · floor 2 bps | all features | 14,852 | 86% | -0.0698 | -0.0252 | -0.0698 ± 0.0474 | 0 of 4 |
-| 60 s · k 1 · floor 2 bps | all features | 14,552 | 62% | -0.0595 | +0.0688 | -0.0703 ± 0.1127 | 2 of 4 |
-| 15 s · k 0.5 · floor 1 bps | all features | 15,004 | 70% | -0.0173 | -0.0532 | -0.0710 ± 0.1114 | 1 of 4 |
-| 15 s · k 1 · floor 4 bps | all features | 15,004 | 96% | -0.0320 | -0.0720 | -0.0758 ± 0.0971 | 0 of 4 |
-| 60 s · k 1 · floor 0.5 bps | all features | 14,552 | 52% | -0.0611 | +0.0402 | -0.0772 ± 0.0685 | 1 of 4 |
-| 120 s · k 1 · floor 0.5 bps | all features | 13,957 | 43% | -0.0516 | +0.0923 | -0.0810 ± 0.0663 | 1 of 4 |
-| 15 s · k 1 · floor 2 bps | all features | 15,004 | 86% | -0.0424 | -0.0679 | -0.0839 ± 0.0961 | 1 of 4 |
-| 15 s · k 0.5 · floor 4 bps | all features | 15,004 | 96% | -0.0329 | -0.0807 | -0.0847 ± 0.1073 | 0 of 4 |
-| 120 s · k 1 · floor 1 bps | all features | 13,957 | 45% | -0.0624 | +0.0757 | -0.0885 ± 0.0856 | 1 of 4 |
-| 30 s · k 0.5 · floor 2 bps | all features | 14,852 | 72% | -0.0512 | -0.0540 | -0.0900 ± 0.0744 | 1 of 4 |
-| 15 s · k 0.5 · floor 2 bps | all features | 15,004 | 85% | -0.0485 | -0.0959 | -0.1097 ± 0.1394 | 1 of 4 |
-| 60 s · k 1 · floor 4 bps | all features | 14,552 | 81% | -0.0864 | -0.1012 | -0.1106 ± 0.1123 | 1 of 4 |
-| 60 s · k 2 · floor 1 bps | all features | 14,552 | 78% | -0.1059 | -0.0369 | -0.1138 ± 0.1296 | 1 of 4 |
-| 120 s · k 1 · floor 2 bps | all features | 13,957 | 53% | -0.1232 | +0.2072 | -0.1232 ± 0.1812 | 2 of 4 |
-| 30 s · k 1 · floor 0.5 bps | all features | 14,852 | 63% | -0.1323 | -0.0884 | -0.1346 ± 0.0834 | 0 of 4 |
-| 15 s · k 1 · floor 0.5 bps | all features | 15,004 | 73% | -0.1200 | -0.1244 | -0.1378 ± 0.1158 | 0 of 4 |
-| 30 s · k 1 · floor 1 bps | all features | 14,852 | 65% | -0.1360 | -0.0827 | -0.1397 ± 0.0963 | 0 of 4 |
-| 30 s · k 1 · floor 4 bps | all features | 14,852 | 91% | -0.0934 | -0.1404 | -0.1409 ± 0.1898 | 1 of 4 |
-| 30 s · k 0.5 · floor 1 bps | all features | 14,852 | 54% | -0.1092 | -0.0880 | -0.1419 ± 0.0646 | 0 of 4 |
-| 60 s · k 2 · floor 2 bps | all features | 14,552 | 80% | -0.1446 | -0.0166 | -0.1446 ± 0.0977 | 0 of 4 |
-| 60 s · k 0.5 · floor 2 bps | all features | 14,552 | 55% | -0.1141 | -0.0520 | -0.1484 ± 0.1350 | 1 of 4 |
-| 60 s · k 1 · floor 1 bps | all features | 14,552 | 54% | -0.1386 | -0.0121 | -0.1537 ± 0.1724 | 1 of 4 |
-| 120 s · k 2 · floor 0.5 bps | without hour of day | 13,957 | 71% | -0.1550 | +0.1197 | -0.1550 ± 0.2881 | 2 of 4 |
-| 60 s · k 0.5 · floor 4 bps | all features | 14,552 | 80% | -0.1183 | -0.1516 | -0.1580 ± 0.1052 | 0 of 4 |
-| 30 s · k 0.5 · floor 0.5 bps | all features | 14,852 | 47% | -0.1204 | -0.1268 | -0.1665 ± 0.1547 | 1 of 4 |
-| 60 s · k 2 · floor 0.5 bps | all features | 14,552 | 77% | -0.1646 | -0.0838 | -0.1720 ± 0.0952 | 0 of 4 |
-| 30 s · k 0.5 · floor 4 bps | all features | 14,852 | 91% | -0.1086 | -0.1710 | -0.1737 ± 0.2126 | 0 of 4 |
-| 120 s · k 0.5 · floor 2 bps | all features | 13,957 | 38% | -0.2132 | +0.0866 | -0.2132 ± 0.2811 | 2 of 4 |
-| 30 s · k 2 · floor 4 bps | all features | 14,852 | 93% | -0.2013 | -0.2234 | -0.2236 ± 0.3408 | 0 of 4 |
-| 15 s · k 0.5 · floor 0.5 bps | all features | 15,004 | 61% | -0.1998 | -0.2407 | -0.2536 ± 0.3560 | 2 of 4 |
-| 120 s · k 0.5 · floor 4 bps | all features | 13,957 | 66% | -0.2739 | -0.1490 | -0.2794 ± 0.4455 | 0 of 4 |
-| 120 s · k 0.5 · floor 0.5 bps | all features | 13,957 | 21% | -0.3062 | -0.2006 | -0.3377 ± 0.3056 | 0 of 4 |
-| 60 s · k 0.5 · floor 0.5 bps | all features | 14,552 | 34% | -0.2738 | -0.2680 | -0.3439 ± 0.2500 | 0 of 4 |
-| 60 s · k 0.5 · floor 1 bps | all features | 14,552 | 38% | -0.3486 | -0.2962 | -0.4034 ± 0.4833 | 0 of 4 |
-| 120 s · k 0.5 · floor 1 bps | all features | 13,957 | 23% | -0.5067 | -0.3543 | -0.5374 ± 0.7094 | 1 of 4 |
+| Label | Features | Training | Samples | Flat | Edge vs prior | Edge vs trailing prior | Edge vs the better prior | Quarters beating both |
+|---|---|---|--:|--:|--:|--:|--:|--:|
+| 5 s · k 1 · floor 0.5 bps | without hour of day | served window | 23,244 | 83% | +0.0250 | +0.0151 | +0.0151 ± 0.0471 | 2 of 4 |
+| 5 s · k 1 · floor 0.5 bps | all features | served window | 23,244 | 83% | +0.0210 | +0.0111 | +0.0111 ± 0.0503 | 2 of 4 |
+| 5 s · k 1 · floor 0.5 bps | without scaled quantities | served window | 23,244 | 83% | +0.0210 | +0.0111 | +0.0111 ± 0.0533 | 2 of 4 |
+| 5 s · k 1 · floor 0.5 bps | all features | 4 h window | 23,244 | 83% | +0.0200 | +0.0102 | +0.0102 ± 0.0494 | 2 of 4 |
+| 5 s · k 1 · floor 1 bps | all features | served window | 23,244 | 87% | +0.0209 | +0.0091 | +0.0075 ± 0.0327 | 2 of 4 |
+| 5 s · k 1 · floor 1 bps | all features | 4 h window | 23,244 | 87% | +0.0206 | +0.0088 | +0.0073 ± 0.0324 | 2 of 4 |
+| 5 s · k 1 · floor 1 bps | without hour of day | served window | 23,244 | 87% | +0.0197 | +0.0079 | +0.0063 ± 0.0311 | 2 of 4 |
+| 5 s · k 2 · floor 0.5 bps | without scaled quantities | served window | 23,244 | 91% | +0.0062 | +0.0092 | +0.0060 ± 0.0196 | 2 of 4 |
+| 5 s · k 2 · floor 0.5 bps | without hour of day | served window | 23,244 | 91% | +0.0054 | +0.0084 | +0.0052 ± 0.0205 | 2 of 4 |
+| 5 s · k 1 · floor 1 bps | without scaled quantities | served window | 23,244 | 87% | +0.0172 | +0.0054 | +0.0038 ± 0.0389 | 2 of 4 |
+| 5 s · k 2 · floor 0.5 bps | all features | served window | 23,244 | 91% | +0.0036 | +0.0066 | +0.0034 ± 0.0213 | 2 of 4 |
+| 5 s · k 2 · floor 0.5 bps | all features | 4 h window | 23,244 | 91% | +0.0029 | +0.0059 | +0.0027 ± 0.0204 | 2 of 4 |
+| 5 s · k 0.5 · floor 0.5 bps | all features | served window | 23,244 | 78% | +0.0333 | +0.0022 | +0.0007 ± 0.0710 | 2 of 4 |
+| 5 s · k 2 · floor 1 bps | all features | served window | 23,244 | 92% | -0.0003 | +0.0007 | -0.0013 ± 0.0285 | 2 of 4 |
+| 5 s · k 0.5 · floor 1 bps | all features | served window | 23,244 | 86% | +0.0216 | -0.0007 | -0.0027 ± 0.0459 | 2 of 4 |
+| 5 s · k 2 · floor 0.5 bps | all features | served window, 1 h half-life | 23,244 | 91% | -0.0031 | -0.0001 | -0.0033 ± 0.0052 | 1 of 4 |
+| 15 s · k 2 · floor 2 bps | all features | served window | 23,124 | 90% | -0.0044 | +0.0064 | -0.0057 ± 0.0247 | 2 of 4 |
+| 15 s · k 2 · floor 1 bps | all features | served window | 23,124 | 86% | -0.0078 | +0.0149 | -0.0078 ± 0.0373 | 2 of 4 |
+| 15 s · k 1 · floor 0.5 bps | all features | served window | 23,124 | 69% | -0.0077 | -0.0027 | -0.0089 ± 0.0442 | 2 of 4 |
+| 5 s · k 2 · floor 2 bps | all features | served window | 23,244 | 96% | -0.0062 | -0.0069 | -0.0093 ± 0.0200 | 2 of 4 |
+| 5 s · k 1 · floor 1 bps | all features | served window, 1 h half-life | 23,244 | 87% | +0.0038 | -0.0080 | -0.0095 ± 0.0143 | 1 of 4 |
+| 5 s · k 2 · floor 4 bps | all features | served window | 23,244 | 99% | -0.0074 | -0.0097 | -0.0107 ± 0.0125 | 2 of 4 |
+| 5 s · k 2 · floor 0.5 bps | all features | 1 h window | 23,244 | 91% | -0.0098 | -0.0072 | -0.0108 ± 0.0278 | 2 of 4 |
+| 60 s · k 2 · floor 4 bps | all features | served window | 22,584 | 86% | -0.0123 | +0.0163 | -0.0123 ± 0.0865 | 2 of 4 |
+| 15 s · k 2 · floor 0.5 bps | all features | served window | 23,124 | 85% | -0.0125 | +0.0123 | -0.0125 ± 0.0359 | 2 of 4 |
+| 30 s · k 0.5 · floor 1 bps | all features | served window | 22,944 | 49% | +0.0111 | +0.0195 | -0.0133 ± 0.0406 | 2 of 4 |
+| 5 s · k 1 · floor 0.5 bps | all features | served window, 1 h half-life | 23,244 | 83% | -0.0036 | -0.0135 | -0.0135 ± 0.0231 | 2 of 4 |
+| 5 s · k 1 · floor 2 bps | all features | served window | 23,244 | 96% | -0.0038 | -0.0123 | -0.0148 ± 0.0207 | 2 of 4 |
+| 5 s · k 1 · floor 0.5 bps | all features | 1 h window | 23,244 | 83% | -0.0026 | -0.0166 | -0.0184 ± 0.0491 | 2 of 4 |
+| 5 s · k 0.5 · floor 2 bps | all features | served window | 23,244 | 95% | -0.0023 | -0.0158 | -0.0188 ± 0.0237 | 2 of 4 |
+| 5 s · k 0.5 · floor 4 bps | all features | served window | 23,244 | 99% | -0.0134 | -0.0206 | -0.0215 ± 0.0280 | 1 of 4 |
+| 5 s · k 1 · floor 4 bps | all features | served window | 23,244 | 99% | -0.0134 | -0.0206 | -0.0215 ± 0.0280 | 1 of 4 |
+| 30 s · k 2 · floor 0.5 bps | all features | served window | 22,944 | 80% | -0.0218 | +0.0437 | -0.0218 ± 0.0297 | 2 of 4 |
+| 15 s · k 2 · floor 4 bps | all features | served window | 23,124 | 96% | -0.0161 | -0.0186 | -0.0233 ± 0.0278 | 0 of 4 |
+| 30 s · k 2 · floor 1 bps | all features | served window | 22,944 | 81% | -0.0234 | +0.0401 | -0.0234 ± 0.0343 | 1 of 4 |
+| 5 s · k 1 · floor 1 bps | all features | 1 h window | 23,244 | 87% | -0.0040 | -0.0224 | -0.0235 ± 0.0232 | 1 of 4 |
+| 15 s · k 1 · floor 4 bps | all features | served window | 23,124 | 96% | -0.0106 | -0.0193 | -0.0254 ± 0.0272 | 0 of 4 |
+| 15 s · k 1 · floor 1 bps | all features | served window | 23,124 | 73% | -0.0170 | -0.0155 | -0.0254 ± 0.0827 | 2 of 4 |
+| 120 s · k 1 · floor 2 bps | all features | served window | 21,869 | 47% | -0.0254 | +0.2198 | -0.0254 ± 0.0498 | 2 of 4 |
+| 15 s · k 0.5 · floor 4 bps | all features | served window | 23,124 | 96% | -0.0134 | -0.0248 | -0.0311 ± 0.0323 | 0 of 4 |
+| 30 s · k 2 · floor 4 bps | all features | served window | 22,944 | 92% | -0.0216 | -0.0243 | -0.0358 ± 0.0401 | 1 of 4 |
+| 15 s · k 0.5 · floor 0.5 bps | all features | served window | 23,124 | 56% | -0.0109 | -0.0383 | -0.0383 ± 0.0750 | 1 of 4 |
+| 30 s · k 0.5 · floor 0.5 bps | all features | served window | 22,944 | 42% | -0.0054 | -0.0208 | -0.0394 ± 0.0310 | 1 of 4 |
+| 120 s · k 0.5 · floor 2 bps | all features | served window | 21,869 | 33% | -0.0403 | +0.1608 | -0.0403 ± 0.0395 | 0 of 4 |
+| 120 s · k 1 · floor 0.5 bps | all features | served window | 21,869 | 40% | -0.0447 | +0.1249 | -0.0447 ± 0.0433 | 1 of 4 |
+| 120 s · k 1 · floor 1 bps | all features | served window | 21,869 | 41% | -0.0448 | +0.1174 | -0.0448 ± 0.0411 | 0 of 4 |
+| 15 s · k 0.5 · floor 1 bps | all features | served window | 23,124 | 66% | -0.0196 | -0.0393 | -0.0455 ± 0.1033 | 2 of 4 |
+| 60 s · k 2 · floor 1 bps | all features | served window | 22,584 | 76% | -0.0466 | +0.0305 | -0.0466 ± 0.0245 | 0 of 4 |
+| 30 s · k 2 · floor 2 bps | all features | served window | 22,944 | 84% | -0.0482 | -0.0086 | -0.0482 ± 0.0592 | 1 of 4 |
+| 60 s · k 2 · floor 2 bps | all features | served window | 22,584 | 78% | -0.0546 | +0.0491 | -0.0546 ± 0.0800 | 1 of 4 |
+| 30 s · k 1 · floor 4 bps | all features | served window | 22,944 | 89% | -0.0311 | -0.0399 | -0.0570 ± 0.0651 | 1 of 4 |
+| 60 s · k 0.5 · floor 2 bps | all features | served window | 22,584 | 49% | -0.0402 | +0.0079 | -0.0622 ± 0.0280 | 0 of 4 |
+| 30 s · k 0.5 · floor 4 bps | all features | served window | 22,944 | 89% | -0.0330 | -0.0463 | -0.0635 ± 0.0703 | 1 of 4 |
+| 60 s · k 1 · floor 4 bps | all features | served window | 22,584 | 77% | -0.0603 | -0.0399 | -0.0643 ± 0.1237 | 1 of 4 |
+| 15 s · k 1 · floor 2 bps | all features | served window | 23,124 | 84% | -0.0504 | -0.0588 | -0.0646 ± 0.1089 | 2 of 4 |
+| 30 s · k 1 · floor 2 bps | all features | served window | 22,944 | 71% | -0.0524 | -0.0343 | -0.0676 ± 0.1183 | 2 of 4 |
+| 60 s · k 1 · floor 0.5 bps | all features | served window | 22,584 | 48% | -0.0677 | +0.0187 | -0.0677 ± 0.0823 | 2 of 4 |
+| 60 s · k 1 · floor 2 bps | all features | served window | 22,584 | 57% | -0.0695 | +0.0209 | -0.0695 ± 0.0503 | 1 of 4 |
+| 60 s · k 1 · floor 1 bps | all features | served window | 22,584 | 49% | -0.0695 | +0.0321 | -0.0695 ± 0.0855 | 2 of 4 |
+| 60 s · k 2 · floor 0.5 bps | all features | served window | 22,584 | 76% | -0.0696 | +0.0156 | -0.0696 ± 0.0643 | 0 of 4 |
+| 60 s · k 0.5 · floor 4 bps | all features | served window | 22,584 | 76% | -0.0614 | -0.0476 | -0.0714 ± 0.1214 | 2 of 4 |
+| 120 s · k 1 · floor 4 bps | all features | served window | 21,869 | 62% | -0.0753 | +0.0295 | -0.0753 ± 0.0974 | 2 of 4 |
+| 15 s · k 0.5 · floor 2 bps | all features | served window | 23,124 | 83% | -0.0508 | -0.0688 | -0.0756 ± 0.1062 | 2 of 4 |
+| 30 s · k 0.5 · floor 2 bps | all features | served window | 22,944 | 68% | -0.0588 | -0.0521 | -0.0792 ± 0.1075 | 1 of 4 |
+| 120 s · k 0.5 · floor 0.5 bps | all features | served window | 21,869 | 17% | -0.0895 | +0.0244 | -0.0895 ± 0.0519 | 0 of 4 |
+| 120 s · k 0.5 · floor 4 bps | all features | served window | 21,869 | 58% | -0.0920 | +0.0120 | -0.0920 ± 0.0999 | 2 of 4 |
+| 120 s · k 2 · floor 4 bps | all features | served window | 21,869 | 76% | -0.0944 | +0.0628 | -0.0944 ± 0.1279 | 1 of 4 |
+| 120 s · k 0.5 · floor 1 bps | all features | served window | 21,869 | 19% | -0.0955 | +0.0349 | -0.0955 ± 0.0521 | 0 of 4 |
+| 30 s · k 1 · floor 1 bps | all features | served window | 22,944 | 61% | -0.1013 | -0.0536 | -0.1013 ± 0.1869 | 2 of 4 |
+| 120 s · k 2 · floor 0.5 bps | all features | served window | 21,869 | 68% | -0.1147 | +0.1192 | -0.1147 ± 0.1648 | 2 of 4 |
+| 60 s · k 0.5 · floor 1 bps | all features | served window | 22,584 | 33% | -0.1076 | -0.0805 | -0.1368 ± 0.0957 | 1 of 4 |
+| 30 s · k 1 · floor 0.5 bps | all features | served window | 22,944 | 59% | -0.1405 | -0.0961 | -0.1405 ± 0.2193 | 2 of 4 |
+| 60 s · k 0.5 · floor 0.5 bps | all features | served window | 22,584 | 28% | -0.1096 | -0.1110 | -0.1453 ± 0.0307 | 0 of 4 |
+| 120 s · k 2 · floor 2 bps | all features | served window | 21,869 | 70% | -0.2520 | +0.0282 | -0.2520 ± 0.3463 | 2 of 4 |
+| 120 s · k 2 · floor 1 bps | all features | served window | 21,869 | 69% | -0.2605 | -0.0640 | -0.2605 ± 0.3095 | 2 of 4 |

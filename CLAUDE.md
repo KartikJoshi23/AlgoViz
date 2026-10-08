@@ -33,6 +33,10 @@ These rules come from the owner and still apply:
     - S's verdict is preliminary until 7 days of live bars exist (E7). On 2026-10-07 there were 0.17 days.
     - **Collection runs on this machine** from 2026-10-07, through the scheduled task "AlgoViz live collector" (see Running it). Earlier collectors ran as session preview servers and stopped when their session ended, which lost four days.
     - **E9 is approved (2026-10-07):** the rule requires beating both the class prior and the trailing prior. It was amended before the deciding data existed.
+    - E9 and the live collector were pushed as `b2e3404`; CI #22 was all green.
+- **Phase 6** (`docs/implementation-plan.md` §12, "make the edge question answerable, and visible") was **approved 2026-10-08** with the recommended decisions F1–F6. The order is T → V → U → X.
+  - **Stage T** (the study, as served) was pushed 2026-10-08. Next is Stage V: verifying Dependabot #11 and #13 against `main`.
+  - **The protocol is frozen** at 2026-10-08 14:55 UTC (`docs/edge-study-protocol.md`, `study.FREEZE_MS`). Never examine bars from the freeze on, except through `ml_study.py --decide`, which refuses until 7 days of them exist. A change to the protocol after the freeze must be logged in its "Changes" section.
   - **Pushed 2026-10-07:** the fix for Dependabot PR #12's failing install (`constraints.txt` no longer pins `pydantic-core`; plan §11.5). Dependabot replaced #12 with #13 (9 updates, including SQLAlchemy 2.1.3 and FastAPI 0.142.2), and CI #21 on it was all green. Merging it waits on the owner's word.
   - The owner's cutover steps are listed at the end of that entry: the push, the Render Blueprint, the Vercel environment variables.
   - After the cutover, verify with `python backend/scripts/smoke_deploy.py https://<backend>`. Only the owner runs it `--with-token`: the token never passes through Claude.
@@ -61,7 +65,7 @@ These rules come from the owner and still apply:
   - The edge study (Stage S, `docs/edge-study.md`) tests 60 label definitions against a rule fixed in advance.
     - On 1.8 h of live bars it is preliminary and decides nothing.
     - No definition beats both priors convincingly; fold dispersion exceeds every mean edge.
-    - Re-run it with `just study` once 7 days of bars exist, exporting them (`scripts/export_bars.py`) before retention prunes them.
+    - Exploratory runs (`scripts/ml_study.py`) see only bars from before the freeze. The deciding run is `scripts/ml_study.py --decide`, once 7 days of bars from the freeze on exist.
 
 ## Running it
 
@@ -83,7 +87,7 @@ These rules come from the owner and still apply:
 
 - **Backend** (in `backend/`):
   - `ruff check .`, `ruff format --check .`, `mypy`
-  - `pytest -q --cov` — 167 tests (one is POSIX-only, so 166 pass and 1 skips on Windows), coverage floor 90 % (92.69 % now)
+  - `pytest -q --cov` — 173 tests (one is POSIX-only, so 172 pass and 1 skips on Windows), coverage floor 90 % (92.76 % now)
   - `pip-audit -r requirements.txt -r constraints.txt --strict`
   - OpenAPI freshness
 - **Frontend** (in `frontend/`): `npm run format:check`, `npm run check` (tsc · eslint · vitest 29 · next build), `npm audit --omit=dev --audit-level=high`.
@@ -127,6 +131,7 @@ These rules come from the owner and still apply:
 - To diagnose a hang: `py-spy dump` shows thread stacks (idle threads here). The answer came from asyncio *task* stacks, via a scratch pytest plugin that calls `task.print_stack()` on a timer (loaded with `-p`).
 - Training and HMM fits run in spawned processes. On Windows, `Process.start()` blocks while pickling arguments, so start them off the loop.
 - SHAP explainers aren't picklable; they are built on the inference thread one at a time.
+- **Weighted HistGradientBoosting fits are slow** (scikit-learn 1.9). With `sample_weight`, every bin edge of every feature is a weighted percentile: 35,000 calls a fit, 5 to 17 times slower. With no more distinct values than `max_bins`, HGB bins at midpoints instead, so the study bins weighted windows at their unweighted quantiles first (`study.bin_codes`).
 - **`CalibratedClassifierCV` and rare classes.**
   - If a calibration split's fit rows lack one of the window's classes, scikit-learn (1.9) pairs the two-class split model's single probability column with the wrong class, and the ensemble serves p = 1 for a rare class.
   - `TailStoppedHGB(classes=…)` answers for every class in the window, which prevents it. Keep that when changing the recipe.

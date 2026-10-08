@@ -2,39 +2,51 @@
 Edge study
 ==========
 
-Does the model have an edge, and under which label definition?
-(implementation-plan §11, W5). The served pipeline end to end, over a grid of
-label definitions and two feature ablations:
+Does the model have an edge, and under which label definition and training
+window? (implementation-plan §11 W5 and §12 W1–W3; the protocol, fixed before
+the deciding data existed, is `docs/edge-study-protocol.md`). The served
+pipeline end to end:
 
 - Samples come from the engine's own bookkeeping (`MLEngine.ingest_bar`): the
   same feature vectors, rolling medians and session splits as served. Feature
   vectors do not depend on the labels, so they are built once. Each label
   definition then relabels them with the served `barrier_bps` and
   `triple_barrier`, never across a session gap, as the engine does.
-- Each configuration is scored on the earlier part of the data with the served
-  recipe's walk-forward (`walk_forward`, training windows capped at the served
-  sample limit), against the class prior, the trailing prior and the logistic
-  baseline.
+- Each configuration is evaluated as served. The engine refits every 600
+  samples, so for each evaluation block of 600 samples the study fits the
+  served recipe on the configuration's training window, which ends one horizon
+  before the block (no training label reaches into it), and predicts the block.
+  Development: 8 blocks evenly spaced in each quarter of the earlier 75 % of the
+  samples. Holdout: every block of the rest. A block is scored against the
+  class prior of its training window and against the trailing prior; a
+  quarter pools its blocks.
+- Configurations: every label definition with all features and the served
+  training window, then, for the three best, two feature ablations and three
+  training variants (1 h and 4 h windows, and recency weights with a 1 h
+  half-life on the served window).
 - Selection is kept honest. The configuration with the best development edge
-  over the better prior is scored once on the untouched later part
-  (`score_split`), and a rule fixed in advance decides.
+  over the better prior is scored once on the untouched later part, and a rule
+  fixed in advance decides.
 
 **Rule (pre-registered).** Adopt a configuration only if it beats both priors
 (its edge over the better of the class prior and the trailing prior is
-positive) in at least 3 development folds and on the holdout, and only with at
-least 7 days of bars (E7). Below that the study reports and decides nothing.
-The rule first tested the trailing prior alone; at long horizons that was the
-weaker baseline, so it was amended to both (E9, 2026-10-07), before the data
-that decides existed.
+positive) in at least 3 development quarters and on the holdout, and only with
+at least 7 days of bars collected after the protocol was frozen (`FREEZE_MS`).
+Bars from before the freeze shaped the protocol, so they only explore. The rule
+first tested the trailing prior alone; at long horizons that was the weaker
+baseline, so it was amended to both (E9, 2026-10-07), before the deciding data
+existed.
 """
 
 from __future__ import annotations
 
 import math
 import tempfile
+import warnings
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from itertools import pairwise
 from pathlib import Path
 
 import numpy as np
@@ -45,7 +57,7 @@ from algoviz.market.bars import SESSION_GAP_MS, Bar
 from algoviz.ml.engine import MLEngine
 from algoviz.ml.features import FEATURE_NAMES, SCALED_FEATURES
 from algoviz.ml.labels import barrier_bps, triple_barrier
-from algoviz.ml.train import MIN_PER_FOLD, FoldMetrics, score_split, walk_forward
+from algoviz.ml.train import block_log_losses, fit_model
 
 HORIZONS_S = (5, 15, 30, 60, 120)
 BARRIER_KS = (0.5, 1.0, 2.0)
@@ -56,10 +68,15 @@ ABLATIONS: dict[str, tuple[str, ...]] = {
     "without hour of day": ("hour_sin", "hour_cos"),
     "without scaled quantities": SCALED_FEATURES,
 }
-ABLATE_TOP = 3  # the label definitions, best first, the ablations run on
+REFINE_TOP = 3  # the label definitions, best first, the ablations and variants run on
 DEV_SHARE = 0.75  # the earlier part, explored; the rest is the holdout, scored once
-MIN_DAYS = 7.0  # E7: with fewer days of bars the study reports but decides nothing
-MIN_FOLDS_BEATING = 3
+BLOCK = 600  # samples per evaluation block: the served model refits this often
+HGB_BINS = 255  # HistGradientBoostingClassifier's default max_bins
+QUARTERS = 4
+BLOCKS_PER_QUARTER = 8
+MIN_QUARTERS_BEATING = 3
+MIN_DAYS = 7.0  # E7: with fewer days of deciding bars the study reports but decides nothing
+FREEZE_MS = 1_791_471_300_000  # 2026-10-08 14:55 UTC: the protocol was fixed; later bars decide
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,8 +89,31 @@ class LabelSpec:
         return f"{self.horizon_s} s · k {self.barrier_k:g} · floor {self.floor_bps:g} bps"
 
 
+@dataclass(frozen=True, slots=True)
+class Variant:
+    """How a training window is drawn: its length in samples, and recency weights."""
+
+    name: str
+    window: int | None = None  # None: the served `ML_MAX_SAMPLES`
+    half_life_s: float | None = None  # sample weights halve with every half-life of age
+
+
+SERVED = Variant("served window")
+VARIANTS = (
+    SERVED,
+    Variant("1 h window", window=3_600),
+    Variant("4 h window", window=14_400),
+    Variant("served window, 1 h half-life", half_life_s=3_600.0),
+)
+
+
 def label_grid() -> list[LabelSpec]:
     return [LabelSpec(h, k, f) for h in HORIZONS_S for k in BARRIER_KS for f in FLOORS_BPS]
+
+
+def split_at_freeze(bars: Sequence[Bar]) -> tuple[list[Bar], list[Bar]]:
+    """The bars from before the protocol freeze (exploratory) and from it on (deciding)."""
+    return [b for b in bars if b.ts_ms < FREEZE_MS], [b for b in bars if b.ts_ms >= FREEZE_MS]
 
 
 @dataclass(slots=True)
@@ -82,12 +122,14 @@ class Samples:
 
     X: np.ndarray  # (samples, features)
     rows: np.ndarray  # each sample's bar index
+    ts_ms: np.ndarray  # each sample's bar open time
     closes: list[float]  # every bar's close
     vol_bps: list[float | None]  # every bar's volatility (it scales the barrier)
     session_end: np.ndarray  # per bar: one past the last bar of its session
     n_bars: int
     sessions: int
     span_ms: tuple[int, int]  # the first and last bar's open time
+    _labels: dict[LabelSpec, tuple[np.ndarray, np.ndarray]] = field(default_factory=dict)
 
     @property
     def days(self) -> float:
@@ -96,6 +138,8 @@ class Samples:
 
     def labels(self, spec: LabelSpec) -> tuple[np.ndarray, np.ndarray]:
         """The samples `spec` can label and their classes; no horizon reaches across a gap."""
+        if spec in self._labels:
+            return self._labels[spec]
         keep = np.zeros(len(self.rows), dtype=bool)
         y = np.zeros(len(self.rows), dtype=int)
         h = spec.horizon_s
@@ -107,7 +151,8 @@ class Samples:
             if lab is not None:
                 keep[k] = True
                 y[k] = lab.cls
-        return keep, y[keep]
+        self._labels[spec] = (keep, y[keep])
+        return self._labels[spec]
 
 
 def build_samples(bars: Sequence[Bar], cfg: Settings) -> Samples:
@@ -134,6 +179,7 @@ def build_samples(bars: Sequence[Bar], cfg: Settings) -> Samples:
     return Samples(
         X=X,
         rows=np.array([index[int(t)] for t in ts], dtype=int),
+        ts_ms=np.asarray(ts, dtype=np.int64),
         closes=[b.close for b in bars],
         vol_bps=[b.volatility_bps for b in bars],
         session_end=session_end,
@@ -143,22 +189,128 @@ def build_samples(bars: Sequence[Bar], cfg: Settings) -> Samples:
     )
 
 
+# ── Evaluation as served ──────────────────────────────────────────
+
+
+@dataclass(frozen=True, slots=True)
+class Score:
+    """Mean log-loss over scored samples: the model's, and each prior's."""
+
+    n_test: int
+    log_loss: float
+    prior_log_loss: float  # the class prior of each block's training window
+    trailing_prior_log_loss: float
+
+    @property
+    def edge(self) -> float:
+        """Log-loss improvement over the better of the two priors."""
+        return min(self.prior_log_loss, self.trailing_prior_log_loss) - self.log_loss
+
+    @staticmethod
+    def pool(parts: Sequence[Score]) -> Score:
+        n = sum(p.n_test for p in parts)
+        weights = np.array([p.n_test for p in parts]) / n
+        lls = np.array([[p.log_loss, p.prior_log_loss, p.trailing_prior_log_loss] for p in parts])
+        ll, prior, trailing = (float(v) for v in weights @ lls)
+        return Score(n, ll, prior, trailing)
+
+
+def training_rows(start: int, horizon: int, window: int) -> np.ndarray:
+    """A block's training window: it ends one horizon before the block, so no label reaches in."""
+    end = max(0, start - horizon)
+    return np.arange(max(0, end - window), end)
+
+
+def bin_codes(X_fit: np.ndarray, X_other: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Each feature replaced by its bin among `HGB_BINS` unweighted quantiles of
+    `X_fit`, the edges an unweighted fit would use. With no more distinct values
+    than bins, HGB bins weighted data at midpoints; otherwise it computes every
+    edge as a weighted percentile, which made a weighted fit 5 to 17 times slower.
+    Recency weights then shape the trees and the calibration, not the bin edges.
+    """
+    q = np.linspace(0, 100, HGB_BINS + 1)[1:-1]
+    edges = np.percentile(X_fit, q, axis=0, method="averaged_inverted_cdf")
+    codes = [
+        np.column_stack([np.searchsorted(edges[:, j], X[:, j]) for j in range(X.shape[1])])
+        for X in (X_fit, X_other)
+    ]
+    return codes[0].astype(np.float64), codes[1].astype(np.float64)
+
+
+def recency_weights(ts_ms: np.ndarray, rows: np.ndarray, half_life_s: float) -> np.ndarray:
+    """Weights that halve with every `half_life_s` of age, the newest training sample at 1."""
+    age_s = (ts_ms[rows[-1]] - ts_ms[rows]) / 1000
+    return np.power(0.5, age_s / half_life_s)
+
+
+def score_block(
+    X: np.ndarray,
+    y: np.ndarray,
+    ts_ms: np.ndarray,
+    block: tuple[int, int],
+    horizon: int,
+    *,
+    window: int,
+    half_life_s: float | None,
+    min_train: int,
+    seed: int,
+) -> Score | None:
+    """Refit as served on the block's training window, then score the block (None: too little)."""
+    tr = training_rows(block[0], horizon, window)
+    if len(tr) < min_train or len(np.unique(y[tr])) < 2:
+        return None
+    X_tr, X_te, weights = X[tr], X[block[0] : block[1]], None
+    if half_life_s is not None:
+        weights = recency_weights(ts_ms, tr, half_life_s)
+        X_tr, X_te = bin_codes(X_tr, X_te)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model, _ = fit_model(X_tr, y[tr], horizon, seed, sample_weight=weights)
+    ll, prior, trailing = block_log_losses(model, X_te, y, tr, np.arange(*block), horizon)
+    return Score(block[1] - block[0], ll, prior, trailing)
+
+
+def development_blocks(
+    n_dev: int, horizon: int, min_train: int, per_quarter: int = BLOCKS_PER_QUARTER
+) -> list[list[tuple[int, int]]]:
+    """
+    Per quarter of the development samples that have a training window's worth of
+    history, `per_quarter` evenly spaced blocks of up to `BLOCK` samples.
+    """
+    first = min_train + horizon
+    if n_dev - first < QUARTERS * per_quarter:
+        return []
+    quarters = []
+    for lo, hi in pairwise(np.linspace(first, n_dev, QUARTERS + 1).astype(int).tolist()):
+        step = (hi - lo) // per_quarter
+        size = min(BLOCK, step)
+        quarters.append([(lo + k * step, lo + k * step + size) for k in range(per_quarter)])
+    return quarters
+
+
+def holdout_blocks(n_dev: int, n: int, horizon: int) -> list[tuple[int, int]]:
+    """Every block of the later part, after an embargo of one horizon."""
+    return [(s, min(s + BLOCK, n)) for s in range(n_dev + horizon, n, BLOCK)]
+
+
 @dataclass(slots=True)
 class ConfigResult:
     spec: LabelSpec
     ablation: str
     n: int  # labelled samples, development and holdout
     flat_share: float
-    folds: list[FoldMetrics]  # development walk-forward
+    quarters: list[Score]  # development, each pooling its blocks
+    variant: Variant = SERVED
+
+    @property
+    def name(self) -> str:
+        return f"{self.spec} ({self.ablation}, {self.variant.name})"
 
     @property
     def edges(self) -> list[float]:
-        """Log-loss improvement over the better of the two priors, per development fold."""
-        return [
-            min(f.prior_log_loss, f.trailing_prior_log_loss) - f.log_loss
-            for f in self.folds
-            if f.trailing_prior_log_loss is not None
-        ]
+        """Log-loss improvement over the better of the two priors, per development quarter."""
+        return [q.edge for q in self.quarters]
 
     @property
     def mean_edge(self) -> float:
@@ -170,55 +322,87 @@ class ConfigResult:
 
     @property
     def mean_edge_vs_prior(self) -> float:
-        return float(np.mean([f.prior_log_loss - f.log_loss for f in self.folds]))
+        return float(np.mean([q.prior_log_loss - q.log_loss for q in self.quarters]))
 
     @property
     def mean_edge_vs_trailing(self) -> float:
-        return float(
-            np.mean(
-                [
-                    f.trailing_prior_log_loss - f.log_loss
-                    for f in self.folds
-                    if f.trailing_prior_log_loss is not None
-                ]
-            )
-        )
+        return float(np.mean([q.trailing_prior_log_loss - q.log_loss for q in self.quarters]))
 
 
-def _design(samples: Samples, spec: LabelSpec, ablation: str) -> tuple[np.ndarray, np.ndarray]:
+def _design(
+    samples: Samples, spec: LabelSpec, ablation: str
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     keep, y = samples.labels(spec)
     drop = set(ABLATIONS[ablation])
     cols = [j for j, name in enumerate(FEATURE_NAMES) if name not in drop]
-    return samples.X[keep][:, cols], y
+    return samples.X[keep][:, cols], y, samples.ts_ms[keep]
 
 
 def evaluate(
-    samples: Samples, spec: LabelSpec, ablation: str, *, max_train_size: int, seed: int = 7
+    samples: Samples,
+    spec: LabelSpec,
+    ablation: str = ALL_FEATURES,
+    variant: Variant = SERVED,
+    *,
+    cap: int,
+    min_train: int,
+    seed: int = 7,
+    per_quarter: int = BLOCKS_PER_QUARTER,
 ) -> ConfigResult:
-    """The development walk-forward of one configuration (no folds if it labels too little)."""
-    X, y = _design(samples, spec, ablation)
+    """One configuration's development quarters (none if it labels too little)."""
+    X, y, ts = _design(samples, spec, ablation)
     n_dev = int(len(y) * DEV_SHARE)
     flat = float((y == 1).mean()) if len(y) else 0.0
-    folds: list[FoldMetrics] = []
-    if n_dev >= MIN_PER_FOLD * 3 and len(np.unique(y[:n_dev])) >= 2:
-        folds, _ = walk_forward(
-            X[:n_dev], y[:n_dev], spec.horizon_s, seed=seed, max_train_size=max_train_size
-        )
-    return ConfigResult(spec, ablation, len(y), flat, folds)
+    quarters = []
+    for blocks in development_blocks(n_dev, spec.horizon_s, min_train, per_quarter):
+        scored = [
+            score
+            for block in blocks
+            if (
+                score := score_block(
+                    X,
+                    y,
+                    ts,
+                    block,
+                    spec.horizon_s,
+                    window=variant.window or cap,
+                    half_life_s=variant.half_life_s,
+                    min_train=min_train,
+                    seed=seed,
+                )
+            )
+            is not None
+        ]
+        if scored:
+            quarters.append(Score.pool(scored))
+    return ConfigResult(spec, ablation, len(y), flat, quarters, variant)
 
 
 def holdout(
-    samples: Samples, result: ConfigResult, *, max_train_size: int, seed: int = 7
-) -> FoldMetrics | None:
-    """Score a configuration once on the later part, trained on the end of the development part."""
-    X, y = _design(samples, result.spec, result.ablation)
+    samples: Samples, result: ConfigResult, *, cap: int, min_train: int, seed: int = 7
+) -> Score | None:
+    """Score a configuration once, on every block of the later part."""
+    X, y, ts = _design(samples, result.spec, result.ablation)
     n_dev = int(len(y) * DEV_SHARE)
-    tr = np.arange(max(0, n_dev - max_train_size), n_dev)
-    te = np.arange(n_dev + result.spec.horizon_s, len(y))  # the embargo: no label reaches in
-    if len(te) < MIN_PER_FOLD or len(np.unique(y[tr])) < 2:
-        return None
-    metrics, _ = score_split(X, y, tr, te, result.spec.horizon_s, seed=seed)
-    return metrics
+    scored = [
+        score
+        for block in holdout_blocks(n_dev, len(y), result.spec.horizon_s)
+        if (
+            score := score_block(
+                X,
+                y,
+                ts,
+                block,
+                result.spec.horizon_s,
+                window=result.variant.window or cap,
+                half_life_s=result.variant.half_life_s,
+                min_train=min_train,
+                seed=seed,
+            )
+        )
+        is not None
+    ]
+    return Score.pool(scored) if scored else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -227,22 +411,24 @@ class Verdict:
     reason: str
 
 
-def decide(best: ConfigResult, held: FoldMetrics | None, days: float) -> Verdict:
+def decide(best: ConfigResult, held: Score | None, days: float, *, deciding: bool) -> Verdict:
     """The pre-registered rule."""
+    if not deciding:
+        return Verdict(
+            False, "exploratory: bars from before the protocol was frozen; nothing is decided"
+        )
     if days < MIN_DAYS:
         return Verdict(
             False,
             f"preliminary: {days:.2f} days of bars, the rule needs {MIN_DAYS:g}; nothing is decided",
         )
-    if held is None or held.trailing_prior_log_loss is None:
+    if held is None:
         return Verdict(False, "no holdout to score; nothing is decided")
-    edge = min(held.prior_log_loss, held.trailing_prior_log_loss) - held.log_loss
     summary = (
-        f"{best.spec} ({best.ablation}) beat both priors in {best.beating} of "
-        f"{len(best.folds)} development folds, and the better prior by {edge:+.4f} nats "
-        "on the holdout"
+        f"{best.name} beat both priors in {best.beating} of {len(best.quarters)} development "
+        f"quarters, and the better prior by {held.edge:+.4f} nats on the holdout"
     )
-    if best.beating >= MIN_FOLDS_BEATING and edge > 0:
+    if best.beating >= MIN_QUARTERS_BEATING and held.edge > 0:
         return Verdict(True, f"adopt: {summary}")
     return Verdict(False, f"no edge: {summary}")
 
@@ -252,42 +438,57 @@ class StudyReport:
     samples: Samples
     results: list[ConfigResult]
     best: ConfigResult | None
-    holdout: FoldMetrics | None
+    holdout: Score | None
     verdict: Verdict
+    deciding: bool
+    protocol: str | None  # the protocol document's digest
 
 
 def run_study(
     bars: Sequence[Bar],
     cfg: Settings,
     *,
+    deciding: bool,
     specs: Sequence[LabelSpec] | None = None,
+    protocol: str | None = None,
     seed: int = 7,
+    per_quarter: int = BLOCKS_PER_QUARTER,
     progress: Callable[[ConfigResult], None] | None = None,
 ) -> StudyReport:
+    """
+    The study on `bars`. Only a run on bars from after the freeze (`deciding`) can
+    adopt anything; `per_quarter` other than the protocol's is for tests.
+    """
     samples = build_samples(bars, cfg)
-    cap = cfg.ML_MAX_SAMPLES  # training windows as large as the served model's, no larger
+    # Training windows as large as the served model's, no larger; no fit on fewer
+    # samples than the engine would train on.
+    limits = {"cap": cfg.ML_MAX_SAMPLES, "min_train": cfg.ML_MIN_DATA_POINTS, "seed": seed}
     results: list[ConfigResult] = []
 
-    def run(spec: LabelSpec, ablation: str) -> None:
-        result = evaluate(samples, spec, ablation, max_train_size=cap, seed=seed)
+    def run(spec: LabelSpec, ablation: str = ALL_FEATURES, variant: Variant = SERVED) -> None:
+        result = evaluate(samples, spec, ablation, variant, per_quarter=per_quarter, **limits)
         results.append(result)
         if progress is not None:
             progress(result)
 
     for spec in specs or label_grid():
-        run(spec, ALL_FEATURES)
-    ranked = sorted((r for r in results if r.folds), key=lambda r: r.mean_edge, reverse=True)
-    for r in ranked[:ABLATE_TOP]:
+        run(spec)
+    ranked = sorted((r for r in results if r.quarters), key=lambda r: r.mean_edge, reverse=True)
+    for r in ranked[:REFINE_TOP]:
         for ablation in ABLATIONS:
             if ablation != ALL_FEATURES:
                 run(r.spec, ablation)
-    scored = [r for r in results if r.folds]
+        for variant in VARIANTS:
+            if variant != SERVED:
+                run(r.spec, variant=variant)
+    scored = [r for r in results if r.quarters]
     if not scored:
         verdict = Verdict(False, "too few labelled samples for any configuration")
-        return StudyReport(samples, results, None, None, verdict)
+        return StudyReport(samples, results, None, None, verdict, deciding, protocol)
     best = max(scored, key=lambda r: r.mean_edge)
-    held = holdout(samples, best, max_train_size=cap, seed=seed)
-    return StudyReport(samples, results, best, held, decide(best, held, samples.days))
+    held = holdout(samples, best, **limits)
+    verdict = decide(best, held, samples.days, deciding=deciding)
+    return StudyReport(samples, results, best, held, verdict, deciding, protocol)
 
 
 def render(report: StudyReport) -> str:
@@ -296,46 +497,50 @@ def render(report: StudyReport) -> str:
     first, last = (
         datetime.fromtimestamp(t / 1000, tz=UTC).strftime("%Y-%m-%d %H:%M") for t in s.span_ms
     )
+    freeze = datetime.fromtimestamp(FREEZE_MS / 1000, tz=UTC).strftime("%Y-%m-%d %H:%M")
+    kind = "deciding (from the freeze on)" if report.deciding else "exploratory (before the freeze)"
     lines = [
         "# Edge study",
         "",
-        f"- Data: {s.n_bars:,} bars ({s.days:.2f} days of bars) in {s.sessions} "
+        f"- Data, {kind}: {s.n_bars:,} bars ({s.days:.2f} days of bars) in {s.sessions} "
         f"session{'s' if s.sessions != 1 else ''}, "
         f"{first} to {last} UTC; {len(s.rows):,} samples with a full lookback.",
+        f"- Protocol: `docs/edge-study-protocol.md`"
+        f"{f' (sha256 {report.protocol})' if report.protocol else ''}, frozen {freeze} UTC.",
+        f"- Evaluation as served: a refit every {BLOCK} samples; {BLOCKS_PER_QUARTER} blocks in "
+        f"each of {QUARTERS} development quarters (the earlier {DEV_SHARE:.0%}); every block of "
+        "the holdout.",
         f"- Rule, fixed in advance: adopt only if the model beats both the class prior and the "
-        f"trailing prior in at least {MIN_FOLDS_BEATING} development folds and on the holdout, "
-        f"with at least {MIN_DAYS:g} days of bars.",
+        f"trailing prior in at least {MIN_QUARTERS_BEATING} development quarters and on the "
+        f"holdout, with at least {MIN_DAYS:g} days of bars from the freeze on.",
         f"- **Verdict: {report.verdict.reason}.**",
     ]
     if report.best is not None and report.holdout is not None:
         h = report.holdout
-        trailing = h.trailing_prior_log_loss
         lines.append(
-            f"- Holdout ({report.best.spec}, {report.best.ablation}): {h.n_test:,} samples, "
-            f"log-loss {h.log_loss:.4f} vs class prior {h.prior_log_loss:.4f} "
-            f"and trailing prior {trailing:.4f}."
-            if trailing is not None
-            else f"- Holdout: {h.n_test:,} samples, log-loss {h.log_loss:.4f}."
+            f"- Holdout ({report.best.name}): {h.n_test:,} samples, log-loss {h.log_loss:.4f} "
+            f"vs class prior {h.prior_log_loss:.4f} and trailing prior "
+            f"{h.trailing_prior_log_loss:.4f}."
         )
     lines += [
         "",
-        "Development walk-forward, best first. Edges are log-loss improvements in nats; "
-        "the trailing prior is the class mix of the labels already resolved at each prediction. "
-        "The rule's edge is over the better of the two priors, fold by fold.",
+        "Development, best first. Edges are log-loss improvements in nats; the trailing prior "
+        "is the class mix of the labels already resolved at each prediction. The rule's edge is "
+        "over the better of the two priors, quarter by quarter.",
         "",
-        "| Label | Features | Samples | Flat | Edge vs prior | Edge vs trailing prior "
-        "| Edge vs the better prior | Folds beating both |",
-        "|---|---|--:|--:|--:|--:|--:|--:|",
+        "| Label | Features | Training | Samples | Flat | Edge vs prior | Edge vs trailing prior "
+        "| Edge vs the better prior | Quarters beating both |",
+        "|---|---|---|--:|--:|--:|--:|--:|--:|",
     ]
     for r in sorted(report.results, key=lambda r: r.mean_edge, reverse=True):
-        if not r.folds:
-            lines.append(f"| {r.spec} | {r.ablation} | {r.n:,} | — | — | — | too few samples | — |")
+        head = f"| {r.spec} | {r.ablation} | {r.variant.name} | {r.n:,} |"
+        if not r.quarters:
+            lines.append(f"{head} — | — | — | too few samples | — |")
             continue
         sd = float(np.std(r.edges))
         lines.append(
-            f"| {r.spec} | {r.ablation} | {r.n:,} | {r.flat_share:.0%} | "
-            f"{r.mean_edge_vs_prior:+.4f} | {r.mean_edge_vs_trailing:+.4f} | "
-            f"{r.mean_edge:+.4f} ± {sd:.4f} | "
-            f"{r.beating} of {len(r.folds)} |"
+            f"{head} {r.flat_share:.0%} | {r.mean_edge_vs_prior:+.4f} | "
+            f"{r.mean_edge_vs_trailing:+.4f} | {r.mean_edge:+.4f} ± {sd:.4f} | "
+            f"{r.beating} of {len(r.quarters)} |"
         )
     return "\n".join(lines) + "\n"

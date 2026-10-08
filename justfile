@@ -68,6 +68,10 @@ study:
     cd backend && {{python}} scripts/export_bars.py
     cd backend && {{python}} scripts/ml_study.py --out ../docs/edge-study.md
 
+# The deciding edge study: refused until 7 days of bars from the protocol's freeze on exist
+study-decide:
+    cd backend && {{python}} scripts/ml_study.py --decide --out ../docs/edge-study.md
+
 # Format everything (ruff for Python, prettier for the frontend)
 format:
     cd backend && ruff check --fix . && ruff format .

@@ -24,6 +24,7 @@ from algoviz.db import _alembic_config, async_session
 from algoviz.market.bars import Bar
 from algoviz.market.persistence import read_bar_exports, write_bar_export
 from algoviz.market.regime import RegimeDetector, TrendTracker, hac_t_stat
+from algoviz.ml import study
 from algoviz.ml.engine import MLEngine
 from algoviz.ml.evaluation import brier_decomposition, pool_curves, reliability_curve
 from algoviz.ml.explain import Explainer
@@ -37,16 +38,30 @@ from algoviz.ml.features import (
 )
 from algoviz.ml.registry import ModelRegistry, model_manifest
 from algoviz.ml.study import (
-    ABLATE_TOP,
     ABLATIONS,
     ALL_FEATURES,
-    MIN_FOLDS_BEATING,
+    DEV_SHARE,
+    FREEZE_MS,
+    MIN_QUARTERS_BEATING,
+    REFINE_TOP,
+    SERVED,
+    VARIANTS,
     ConfigResult,
     LabelSpec,
+    Score,
+    Variant,
+    bin_codes,
     build_samples,
     decide,
+    development_blocks,
+    evaluate,
+    holdout_blocks,
+    recency_weights,
     render,
     run_study,
+    score_block,
+    split_at_freeze,
+    training_rows,
 )
 from algoviz.ml.train import (
     ES_TAIL,
@@ -55,10 +70,8 @@ from algoviz.ml.train import (
     TrainResult,
     base_estimators,
     fit_model,
-    score_split,
     trailing_prior_proba,
     train,
-    walk_forward,
 )
 
 S = "BTCUSDT"
@@ -424,38 +437,148 @@ def test_folds_score_the_trailing_prior_and_older_artefacts_still_load(
     assert "edge_vs_trailing_prior" not in dataclasses.replace(r, folds=[old]).oos
 
 
+def _rolling(X: np.ndarray, y: np.ndarray, horizon: int = 5) -> tuple[list[Score], Score]:
+    """The study's evaluation on bare arrays: development quarters and the holdout, as served."""
+    ts = np.arange(len(y), dtype=np.int64) * 1000
+    n_dev = int(len(y) * DEV_SHARE)
+    kw: dict[str, Any] = {"window": 20_000, "half_life_s": None, "min_train": 300, "seed": 7}
+
+    def pooled(blocks: list[tuple[int, int]]) -> Score:
+        return Score.pool([s for b in blocks if (s := score_block(X, y, ts, b, horizon, **kw))])
+
+    quarters = [pooled(q) for q in development_blocks(n_dev, horizon, 300, per_quarter=2)]
+    return quarters, pooled(holdout_blocks(n_dev, len(y), horizon))
+
+
 def test_the_rule_adopts_a_planted_edge_and_nothing_less() -> None:
     X, y = _dataset(3000)
     spec = LabelSpec(5, 1.0, 0.5)
-    dev, test = np.arange(2250), np.arange(2255, 3000)
-
-    folds, _ = walk_forward(X[dev], y[dev], 5)
-    planted = ConfigResult(spec, ALL_FEATURES, len(y), float((y == 1).mean()), folds)
-    held, _ = score_split(X, y, dev, test, 5)
-    assert planted.beating == len(folds) >= MIN_FOLDS_BEATING
-    assert decide(planted, held, days=8).adopt
-    too_soon = decide(planted, held, days=1)  # the same result on a day of bars decides nothing
+    quarters, held = _rolling(X, y)
+    planted = ConfigResult(spec, ALL_FEATURES, len(y), float((y == 1).mean()), quarters)
+    assert planted.beating == len(quarters) == 4 >= MIN_QUARTERS_BEATING
+    assert decide(planted, held, days=8, deciding=True).adopt
+    too_soon = decide(planted, held, days=1, deciding=True)  # a day of bars decides nothing
     assert not too_soon.adopt and too_soon.reason.startswith("preliminary")
+    # bars from before the freeze shaped the protocol: they never decide, however strong
+    explored = decide(planted, held, days=8, deciding=False)
+    assert not explored.adopt and explored.reason.startswith("exploratory")
 
     # Beating the trailing prior while losing to the class prior is no edge (E9): the
     # first rule tested the trailing prior alone and would have adopted this.
-    def lose_to_the_class_prior(f: FoldMetrics) -> FoldMetrics:
-        return dataclasses.replace(f, prior_log_loss=f.log_loss - 0.01)
+    def lose_to_the_class_prior(q: Score) -> Score:
+        return dataclasses.replace(q, prior_log_loss=q.log_loss - 0.01)
 
     weaker = ConfigResult(
-        spec, ALL_FEATURES, len(y), planted.flat_share, [lose_to_the_class_prior(f) for f in folds]
+        spec,
+        ALL_FEATURES,
+        len(y),
+        planted.flat_share,
+        [lose_to_the_class_prior(q) for q in quarters],
     )
-    assert all(f.trailing_prior_log_loss > f.log_loss for f in weaker.folds)
+    assert all(q.trailing_prior_log_loss > q.log_loss for q in weaker.quarters)
     assert weaker.beating == 0
-    verdict = decide(weaker, lose_to_the_class_prior(held), days=8)
+    verdict = decide(weaker, lose_to_the_class_prior(held), days=8, deciding=True)
     assert not verdict.adopt and verdict.reason.startswith("no edge")
 
     shuffled = np.random.RandomState(3).permutation(y)
-    folds, _ = walk_forward(X[dev], shuffled[dev], 5)
-    noise = ConfigResult(spec, ALL_FEATURES, len(y), float((shuffled == 1).mean()), folds)
-    held, _ = score_split(X, shuffled, dev, test, 5)
-    verdict = decide(noise, held, days=8)
+    quarters, held = _rolling(X, shuffled)
+    noise = ConfigResult(spec, ALL_FEATURES, len(y), float((shuffled == 1).mean()), quarters)
+    verdict = decide(noise, held, days=8, deciding=True)
     assert not verdict.adopt and verdict.reason.startswith("no edge")
+
+
+def test_blocks_refit_as_served_and_never_train_on_what_they_score(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, synthetic_bars: list[Bar]
+) -> None:
+    cfg = Settings(_env_file=None, ML_MODEL_DIR=tmp_path)  # type: ignore[call-arg]
+    samples = build_samples(synthetic_bars, cfg)
+    spec, window = LabelSpec(30, 1.0, 1.0), 400
+    scored: list[tuple[np.ndarray, np.ndarray]] = []
+    fits: list[int] = []
+    real_fit, real_score = study.fit_model, study.block_log_losses
+
+    def fit_spy(X: np.ndarray, y: np.ndarray, *args: Any, **kw: Any) -> Any:
+        fits.append(len(X))
+        return real_fit(X, y, *args, **kw)
+
+    def score_spy(model: Any, X: np.ndarray, y: np.ndarray, tr: Any, te: Any, h: int) -> Any:
+        scored.append((tr, te))
+        return real_score(model, X, y, tr, te, h)
+
+    monkeypatch.setattr(study, "fit_model", fit_spy)
+    monkeypatch.setattr(study, "block_log_losses", score_spy)
+    result = evaluate(
+        samples, spec, variant=Variant("short", window=window), cap=20_000, min_train=300,
+        per_quarter=2,
+    )  # fmt: skip
+    assert len(result.quarters) == 4 and len(fits) == len(scored) == 8  # one refit per block
+    for (tr, te), n_fit in zip(scored, fits, strict=True):
+        assert len(tr) == n_fit <= window  # the variant caps the window
+        assert tr.max() + spec.horizon_s < te.min()  # every training label resolved before
+    assert training_rows(100, 5, 50).tolist() == list(range(45, 95))
+
+
+def test_recency_weights_halve_every_half_life() -> None:
+    ts = np.arange(0, 7_201, dtype=np.int64) * 1000  # two hours of 1 s samples
+    w = recency_weights(ts, np.arange(len(ts)), half_life_s=3_600.0)
+    assert w[-1] == 1.0 and w[-3_601] == pytest.approx(0.5) and w[0] == pytest.approx(0.25)
+    assert np.all(np.diff(w) > 0)
+
+
+def test_calibration_survives_a_split_model_that_saw_one_class() -> None:
+    # Almost every label is "flat", so the first calibration split fits on "flat" alone.
+    # Such an HGB reports one class but answers with two probability columns, and the
+    # recipe fell back to an uncalibrated model.
+    rng = np.random.RandomState(1)
+    X = rng.normal(size=(900, 4))
+    y = np.ones(900, dtype=int)
+    y[600::25], y[612::25] = 0, 2
+    model, method = fit_model(X, y, 5)
+    assert method == "sigmoid"
+    p = model.predict_proba(X)
+    assert p.shape == (900, 3) and np.allclose(p.sum(axis=1), 1.0)
+
+
+def test_sample_weights_reach_every_tree_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[Any] = []
+    original = HistGradientBoostingClassifier.fit
+
+    def spy(self: Any, X: Any, y: Any, sample_weight: Any = None, **kw: Any) -> Any:
+        seen.append(sample_weight)
+        return original(self, X, y, sample_weight, **kw)
+
+    monkeypatch.setattr(HistGradientBoostingClassifier, "fit", spy)
+    X, y = _dataset(1200)
+    X, _ = bin_codes(X, X[:1])  # as the study fits weighted windows
+    w = np.linspace(0.1, 1.0, len(y))
+    model, method = fit_model(X, y, 5, sample_weight=w)
+    assert method == "isotonic" and len(seen) == len(base_estimators(model)) == 3
+    assert all(s is not None and len(s) < len(y) for s in seen)  # each split model's rows
+    seen.clear()
+    fit_model(X, y, 5)  # served: unweighted
+    assert all(s is None for s in seen)
+
+
+def test_bin_codes_keep_the_unweighted_bins_and_their_order() -> None:
+    rng = np.random.RandomState(4)
+    X_fit, X_other = rng.lognormal(size=(5000, 3)), rng.lognormal(size=(200, 3))
+    codes, other = bin_codes(X_fit, X_other)
+    for j in range(3):
+        assert len(np.unique(codes[:, j])) <= 255  # HGB then bins at midpoints, unweighted
+        order = np.argsort(X_fit[:, j], kind="stable")
+        assert np.all(np.diff(codes[order, j]) >= 0)  # the same order, coarsened
+    # values the fit never saw land in the bins the fit's edges give them
+    assert other.min() >= 0 and other.max() <= 254
+
+
+def test_only_bars_from_the_freeze_on_decide() -> None:
+    bars = [
+        Bar(S, FREEZE_MS + d * 1000, "live", 100.0, 100.1, 99.9, 100.0, 100.0, 1.0, 0.5, 3)
+        for d in (-2, -1, 0, 1)
+    ]  # fmt: skip
+    before, after = split_at_freeze(bars)
+    assert [b.ts_ms - FREEZE_MS for b in before] == [-2000, -1000]
+    assert [b.ts_ms - FREEZE_MS for b in after] == [0, 1000]
 
 
 @pytest.fixture(scope="module")
@@ -489,18 +612,24 @@ async def test_the_study_scores_each_configuration_and_reports_without_deciding(
 ) -> None:
     cfg = Settings(_env_file=None, ML_MODEL_DIR=tmp_path)  # type: ignore[call-arg]
     specs = [LabelSpec(5, 1.0, 0.5), LabelSpec(30, 1.0, 1.0)]
-    report = await asyncio.to_thread(run_study, synthetic_bars, cfg, specs=specs)
+    report = await asyncio.to_thread(
+        lambda: run_study(synthetic_bars, cfg, deciding=False, specs=specs, per_quarter=2)
+    )
 
-    scored = [r for r in report.results if r.folds]
-    ablated = min(ABLATE_TOP, sum(r.ablation == ALL_FEATURES for r in scored))
-    assert ablated == len(specs)  # both label definitions are scored, so both are ablated
-    assert len(report.results) == len(specs) + ablated * (len(ABLATIONS) - 1)
+    scored = [r for r in report.results if r.quarters]
+    served = [r for r in scored if r.ablation == ALL_FEATURES and r.variant == SERVED]
+    refined = min(REFINE_TOP, len(served))
+    assert refined == len(specs)  # both label definitions are scored, so both are refined
+    assert len(report.results) == len(specs) + refined * (len(ABLATIONS) - 1 + len(VARIANTS) - 1)
+    assert {r.variant for r in report.results} == set(VARIANTS)
     assert report.best is not None and report.best.mean_edge == max(r.mean_edge for r in scored)
-    assert report.holdout is not None and report.holdout.trailing_prior_log_loss is not None
-    assert not report.verdict.adopt and report.verdict.reason.startswith("preliminary")
+    assert report.holdout is not None and report.holdout.n_test > 0
+    assert not report.verdict.adopt and report.verdict.reason.startswith("exploratory")
+    deciding = decide(report.best, report.holdout, report.samples.days, deciding=True)
+    assert deciding.reason.startswith("preliminary")  # minutes of bars: still nothing decided
     text = render(report)
     assert text.count("\n| ") == len(report.results) + 1  # the header and a row each
-    assert "UTC" in text and "Holdout (" in text
+    assert "UTC" in text and "Holdout (" in text and "exploratory (before the freeze)" in text
 
 
 def test_bar_exports_round_trip_and_overlap_without_duplicates(tmp_path: Path) -> None:

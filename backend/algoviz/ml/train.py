@@ -118,30 +118,41 @@ class TailStoppedHGB(ClassifierMixin, BaseEstimator):
         self.seed = seed
         self.classes = classes
 
-    def fit(self, X: np.ndarray, y: np.ndarray) -> TailStoppedHGB:
+    def fit(
+        self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray | None = None
+    ) -> TailStoppedHGB:
         n = len(X)
         n_val = int(n * ES_TAIL)
         fit_end = n - n_val - self.gap
         head = y[:fit_end] if fit_end > 0 else y[:0]
+        w = sample_weight
         if n_val >= ES_MIN_VAL and len(np.unique(head)) >= 2:
             val_X, val_y = X[n - n_val :], y[n - n_val :]
             seen = np.isin(val_y, np.unique(head))  # a class the head never saw can't be scored
             model = HistGradientBoostingClassifier(
                 **HGB_PARAMS, early_stopping=True, random_state=self.seed
-            ).fit(X[:fit_end], head, X_val=val_X[seen], y_val=val_y[seen])
+            ).fit(
+                X[:fit_end],
+                head,
+                sample_weight=None if w is None else w[:fit_end],
+                X_val=val_X[seen],
+                y_val=val_y[seen],
+                sample_weight_val=None if w is None else w[n - n_val :][seen],
+            )
         else:
             model = HistGradientBoostingClassifier(
                 **(HGB_PARAMS | {"max_iter": ES_FALLBACK_ITER}),
                 early_stopping=False,
                 random_state=self.seed,
-            ).fit(X, y)
+            ).fit(X, y, sample_weight=w)
         self.model_ = model
         self.classes_ = model.classes_ if self.classes is None else np.asarray(self.classes)
         self.n_iter_ = int(model.n_iter_)
         return self
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
-        p = self.model_.predict_proba(X)
+        # Fitted on one class, HGB still answers with two columns (that class, then 0).
+        p = self.model_.predict_proba(X)[:, : len(self.model_.classes_)]
         if len(self.model_.classes_) == len(self.classes_):
             return p
         out = np.zeros((len(X), len(self.classes_)))
@@ -152,8 +163,17 @@ class TailStoppedHGB(ClassifierMixin, BaseEstimator):
         return self.model_.predict(X)
 
 
-def fit_model(X: np.ndarray, y: np.ndarray, gap: int, seed: int = 7) -> tuple[Any, str]:
-    """The served recipe on one training window. Returns the model and its calibration method."""
+def fit_model(
+    X: np.ndarray,
+    y: np.ndarray,
+    gap: int,
+    seed: int = 7,
+    sample_weight: np.ndarray | None = None,
+) -> tuple[Any, str]:
+    """
+    The served recipe on one training window. Returns the model and its calibration
+    method. `sample_weight` (none when served) reaches the trees and the calibrators.
+    """
     n = len(X)
     if n >= CAL_MIN:
         method = "isotonic" if n >= ISOTONIC_MIN else "sigmoid"
@@ -165,10 +185,10 @@ def fit_model(X: np.ndarray, y: np.ndarray, gap: int, seed: int = 7) -> tuple[An
             ensemble=True,
         )
         try:
-            return calibrated.fit(X, y), method
+            return calibrated.fit(X, y, sample_weight=sample_weight), method
         except ValueError as exc:  # a calibration split lacked a class
             logger.warning("calibration failed (%s); serving the uncalibrated model", exc)
-    return TailStoppedHGB(gap=gap, seed=seed).fit(X, y), "none"
+    return TailStoppedHGB(gap=gap, seed=seed).fit(X, y, sample_weight=sample_weight), "none"
 
 
 def base_estimators(model: Any) -> list[TailStoppedHGB]:
@@ -225,6 +245,21 @@ def trailing_prior_proba(
     lo = np.clip(hi - window, 0, None)
     known = counts[hi] - counts[lo] + 1.0
     return known / known.sum(axis=1, keepdims=True)
+
+
+def block_log_losses(
+    model: Any, X_te: np.ndarray, y: np.ndarray, tr: np.ndarray, te: np.ndarray, horizon_bars: int
+) -> tuple[float, float, float]:
+    """
+    Mean log-loss on rows `te` (features `X_te`): the model, the class prior of
+    rows `tr`, and the trailing prior.
+    """
+    yt = y[te]
+    return (
+        float(log_loss(yt, _align_proba(model, X_te), labels=CLASSES)),
+        float(log_loss(yt, _prior_proba(y[tr], len(te)), labels=CLASSES)),
+        float(log_loss(yt, trailing_prior_proba(y, te, horizon_bars), labels=CLASSES)),
+    )
 
 
 def _neg_log_loss(model: Any, X: np.ndarray, y: np.ndarray) -> float:

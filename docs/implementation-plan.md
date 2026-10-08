@@ -1449,3 +1449,138 @@ Stage letters continue from Phase 4, skipping O (as I was skipped).
   - The development best, 120 s · k 2 · floor 0.5 bps, beat both priors in **4 of 4** folds (+0.048 ± 0.035 nats over the better prior).
   - On the holdout, the newest quarter and mostly a quiet day, its log-loss was 1.378, against 0.840 for the class prior: worse by 0.54 nats. With 7 days of bars the rule would reject it, at the holdout.
   - This is the regime drift §11.1 expected, and why the holdout is scored once and kept out of selection.
+
+## 12. Phase 6 — Make the edge question answerable, and visible (proposed)
+
+> **Status:** proposed 2026-10-08, after the owner chose this direction over housekeeping only or a pause. Approved the same day ("continue") with the recommended decisions F1–F6. Stage T was pushed on 2026-10-08, and the protocol is frozen (14:55 UTC). Next is Stage V. Stages keep §7's review-stop discipline.
+> **Inputs:**
+> - the Stage S study runs of 2026-10-03 and 2026-10-07 (`docs/edge-study.md`);
+> - the live collector's first hours: 18,310 bars (0.21 days) on 2026-10-07, one bar a second while it runs;
+> - a timing of the served recipe on live data: one fit on 19,683 samples takes 1.6 s on 8 threads (3.4 s on one), and predicting 600 rows about 20 ms;
+> - Dependabot PRs #11 and #13 and their CI runs.
+
+### 12.1 Why
+
+| # | Finding | Evidence |
+|---|---|---|
+| 1 | At study scale the walk-forward stops being "evaluated as served". Stage S trains one model per fold and scores it on the whole next fold. On 7 days of bars a fold is about 1.75 days, scored by a model the engine would have replaced about 250 times: it refits every 600 samples (10 min) | `train.walk_forward`: `TimeSeriesSplit(n_splits=4)`. `ML_RETRAIN_EVERY_SAMPLES = 600` |
+| 2 | Regime drift is the live failure mode, and the study tests only one way of training: the served 20,000-sample window. Nothing tests whether a shorter or recency-weighted window survives drift better | 2026-10-07 run: the development best (120 s · k 2 · floor 0.5 bps) beat both priors in 4 of 4 folds (+0.048 nats), then lost to the class prior by 0.54 nats on the holdout, the newest quarter and mostly a quiet day |
+| 3 | The grid, the rule (E9) and any new variants were shaped by bars already examined. If those bars also decide, the decision is circular | The preliminary runs on 2026-10-03 (0.08 days) and 2026-10-07 (0.18 days) |
+| 4 | The study and its verdict live only in `docs/edge-study.md`. The product shows the served model's metrics, but not whether any tested label definition has an edge, or how close the data is to deciding | No endpoint or panel reads the study |
+| 5 | Collection runs headless, and its progress and health are invisible. A stall shows only in `data/logs/collector.log` | Settings → Engine shows the feed, the WebSocket and the loop. `count_bars` exists, but nothing calls it |
+| 6 | Dependabot #11 (npm group: React 19.3, three 0.186.1, …) was tested against a base that predates Stages R and S and the lockfile security update. #13 (Python group, SQLAlchemy 2.1.3) is green | CI #17 on #11 (2026-10-02); CI #21 on #13 (2026-10-07). Both branches merge cleanly into `main` |
+
+### 12.2 Workstreams
+
+**W1 — Evaluate as served, at study scale (findings 1, 2).**
+- **Rolling refits.** For an evaluation block of 600 samples (the served retrain cadence), fit the served recipe on the configuration's training window, which ends one horizon before the block starts (the embargo). Then predict the block. Score it against the class prior of that window and against the trailing prior.
+- **Development:** 32 blocks, 8 evenly spaced in each quarter of the development period. A quarter's edge pools its 8 blocks, so the rule's "3 of 4 folds" becomes "3 of 4 quarters".
+- **Holdout:** every block of the last 25 %, after the embargo, for the selected configuration only.
+- **Cost on 7 days** (about 600,000 samples):
+  - 75 configurations × 32 development blocks, plus about 250 holdout blocks, comes to about 2,650 fits: roughly 70 min serially at 1.6 s each.
+  - Configurations can run in parallel processes, one thread each.
+  - Building the samples takes about 3–4 min (21,000 bars took 6.9 s).
+- **Tests:**
+  - no training row reaches a block (embargo included);
+  - one refit per block;
+  - a planted edge is adopted, and shuffled labels are not;
+  - at today's scale it runs end to end.
+
+**W2 — Drift-robust variants, fixed in advance (finding 2).**
+- **Training windows:** 1 h (3,600 samples), 4 h (14,400) and the served 20,000 (about 5.6 h).
+- **Recency weighting:** exponential sample weights with a 1 h half-life on the served window. Both the HGB and the calibration accept sample weights.
+- **Where they run:** on the three best label definitions with all features, like the ablations.
+- **If one is adopted,** the served recipe takes it through configuration: `ML_MAX_SAMPLES` exists, and a new `ML_SAMPLE_HALF_LIFE_S` would carry the weighting. Both are covered by the model manifest.
+
+**W3 — Freeze the protocol; decide on unseen data (finding 3).**
+- **`docs/edge-study-protocol.md`** states, before the deciding data exists:
+  - the grid, ablations and variants;
+  - the evaluation (blocks, cadence, embargo);
+  - the baselines and the rule;
+  - the deciding-data window.
+  - It is committed with the code that implements it, and every report carries its hash.
+- **The deciding data** are bars stamped after the freeze. The 0.21 days examined so far may inform the protocol but may not decide it.
+- **`ml_study.py --decide`** uses only post-freeze bars and refuses below 7 days of them. Without `--decide` the run uses everything and is labelled exploratory.
+
+**W4 — The finding in the product (findings 4, 5).**
+- **Data.**
+  - `ml_study.py` also writes its report as JSON (`data/edge-study/latest.json`, host-local).
+  - `GET /api/v1/analytics/edge-study` returns that report plus collection progress: live bars stored, days of bars, post-freeze days toward 7, the newest bar's age and retention.
+  - A host where no study has run returns the progress alone.
+- **Intelligence: an "Edge study" panel.**
+  - A verdict badge: exploratory, preliminary, no edge or adopt.
+  - Progress toward 7 post-freeze days, the rule and the protocol hash.
+  - The best configurations, and the holdout.
+  - It is built on the design system and is axe-clean, with reduced-motion and mobile layouts.
+- **Settings → Engine: "Data collection".** Bars stored, days of bars, the oldest and newest bar, retention, and the writer's queue and failed flushes.
+- **Contracts and checks.** Contracts regenerated. The e2e spec covers the panel's "no study on this host" state, and real-GPU captures cover desktop and mobile.
+
+**W5 — Housekeeping (finding 6).**
+- **Dependabot #11 and #13:** merge each onto current `main` in a local worktree, run the full gates and e2e, and report so the owner can make the merge call.
+- **Unchanged and still waiting:** the Linux visual baselines (Docker's engine) and re-blocking the dev-tooling npm audit (a braces fix).
+
+### 12.3 Stages
+
+| Stage | Scope | Reviewable outcome |
+|---|---|---|
+| **T — The study, as served** | W1, W2, W3 | Rolling evaluation and variants, with tests; the protocol written; an exploratory run on today's bars with the cost measured. **The freeze is the push of this stage:** deciding data accrue from then |
+| **V — Housekeeping** | W5 | #11 and #13 verified against `main` (gates and e2e), for the owner's merge call |
+| **U — The edge study in the product** | W4 | The panel and the collection block on the live collector; contracts; e2e and axe; real-GPU captures at 1440 and 390 px |
+| **X — The deciding run** (data-gated) | — | Once 7 post-freeze days exist: `ml_study.py --decide`, and the verdict recorded. If a configuration is adopted: new served defaults, a retrain, a schema bump if features change, and UI copy. If not: "no edge at any tested definition on N days", recorded here and shown by the panel |
+
+**Proposed order: T → V → U → X.**
+- T comes first because the deciding-data clock starts at its push. Every day before the freeze is a day that can't decide.
+- V is small, and unblocks the owner's merges.
+- U shows T's output format, so it follows T.
+
+### 12.4 Decisions needed
+
+| # | Question | Recommendation |
+|---|---|---|
+| F1 | How the study evaluates at scale | Rolling refits at the served cadence (600 samples) on 32 sampled development blocks (8 per quarter), plus every holdout block. The rule reads quarters (≥ 3 of 4) and the holdout. Alternative: refit hourly on every block, which is staler than serving at about the same cost |
+| F2 | Which drift-robust variants | 1 h, 4 h and served training windows, plus a 1 h recency half-life on the served window, run on the three best label definitions. Fixed in the protocol |
+| F3 | Which bars decide | Only bars stamped after the protocol freeze (T's push), at least 7 days of them. Earlier bars stay exploratory |
+| F4 | Where the deciding run happens | This machine, on the collector's database. After the cutover, Render's bars can join through `export_bars.py` (exports deduplicate by open time) |
+| F5 | What the product shows | The study's verdict and collection progress on Intelligence, and collection health under Settings → Engine. The study JSON is host-local, so production shows progress alone until a study runs there |
+| F6 | Stage order | T → V → U → X |
+
+### 12.5 Delivery log
+
+**Stage T — the study, as served (2026-10-08).** W1, W2 and W3. The owner approved §12 with the recommended decisions ("continue", 2026-10-08).
+
+- **Evaluation as served** (`algoviz/ml/study.py`).
+  - A block is 600 samples, the engine's retrain cadence. For each block the study fits the served recipe on the configuration's training window, which ends one horizon before the block, then scores the block. The window is capped at the configuration's size, with at least `ML_MIN_DATA_POINTS` samples.
+  - Development: 8 evenly spaced blocks in each of 4 quarters of the earlier 75 %. A quarter pools its blocks. Holdout: every block of the rest, after an embargo of one horizon.
+  - Baselines per block: the class prior of the training window, and the trailing prior. The rule's edge is over the better of the two, and the rule reads quarters: at least 3 of 4, and the holdout.
+  - Labels are cached per definition. Before, each ablation relabelled every sample, which at 7 days would have cost about 20 minutes.
+- **Variants, fixed in advance** (F2): 1 h and 4 h windows, and the served window with recency weights (1 h half-life of bar time). They run with all features on the three best label definitions, next to the two ablations: 75 configurations in all.
+  - `fit_model` and `TailStoppedHGB` take sample weights, which reach the trees and the calibrators. The served path passes none.
+  - **Weighted fits were 5 to 17 times slower.** With `sample_weight`, scikit-learn 1.9 computes every bin edge of every feature as a weighted percentile: 35,000 calls a fit, 93 % of its time. With no more distinct values than bins, it bins at midpoints instead. So weighted windows are first binned at their unweighted quantiles (`bin_codes`), the edges an unweighted fit uses. A weighted fit on 20,000 samples now takes 2.2 s, against 1.5 s unweighted.
+- **The protocol is frozen** (F3): `docs/edge-study-protocol.md`, at 2026-10-08 14:55 UTC (`FREEZE_MS`).
+  - Bars from the freeze on decide.
+  - `ml_study.py --decide` refuses until 7 days of them exist, so the deciding data stay unexamined until they are complete. Checked: it refused with 0 days.
+  - Without `--decide`, the study runs on earlier bars only, and is labelled exploratory. Every report carries the protocol's SHA-256 prefix.
+- **Found and fixed: calibration fell back when a split saw one class.**
+  - A boosting model fitted on a single class reports one class but answers with two probability columns. `TailStoppedHGB.predict_proba` mapped them as if they were one per class. Calibration raised a shape error, and the recipe served an uncalibrated model.
+  - It surfaced in the first exploratory run on the most lopsided definitions, such as 5 s · k 2 · floor 4 bps, about 99 % flat. It predates Stage T.
+  - A regression test fails on the old code ("none" instead of "sigmoid"). Split models now keep only their own classes' columns.
+  - The protocol is unchanged: it names the served recipe, and this is a fix inside it. The run was restarted on the fixed code.
+- **Exploratory run under the frozen protocol** (`docs/edge-study.md`): 24,018 bars from before the freeze (0.28 days, 13 sessions); 75 configurations in 37 minutes (2,202 s).
+  - Under evaluation as served, the 5 s definitions lead, the served one among them.
+  - The best is 5 s · k 1 · floor 0.5 bps, without the hour-of-day features: +0.015 ± 0.047 nats over the better prior, beating both priors in only **2 of 4** quarters. On the holdout it scored +0.040 (log-loss 0.622, against 0.674 for the class prior and 0.662 for the trailing prior).
+  - The 120 s definitions, which led every earlier run, fall to the bottom (−0.115 and −0.252). They beat the trailing prior but lose heavily to the class prior: the trap E9 closed.
+  - Refitting as served helps the short horizon, but the evidence is thin: 2 of 4 quarters, and a spread larger than the mean. Nothing is decided. That waits for 7 days of bars from the freeze on.
+  - 25 fits fell back to an uncalibrated model because a class had fewer than 3 examples in the window. That is the served recipe's intended fallback.
+  - **Cost at 7 days**, from these timings: about 35 s per configuration here, and about 30 % more fit time on the larger windows. The deciding run should take 1–2 hours.
+- **Checks:**
+  - Backend: ruff, ruff format and mypy clean. pytest: 172 passed and 1 skipped, coverage 92.76 %, in 5.1 min. pip-audit clean.
+  - No API or UI change, so the contracts and the frontend are untouched. e2e runs in CI on the push.
+  - New tests:
+    - a planted edge is adopted only when deciding (never on exploratory bars or on a day of data), and E9's weaker case and shuffled labels are rejected;
+    - one refit per block, the window caps respected, and every training label resolved before its block;
+    - recency weights halve every half-life;
+    - sample weights reach every tree model, while the served fit stays unweighted;
+    - bin codes keep the unweighted bins and their order;
+    - the freeze splits bars;
+    - calibration survives a split model that saw one class.
+- **Pushed 2026-10-08** at the owner's word. The freeze took effect at 14:55 UTC: bars from then on are deciding data, and nothing has examined them.

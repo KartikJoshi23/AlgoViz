@@ -3,7 +3,18 @@
 Notable changes, newest first. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased] — Phase 5: ship, harden, test the model for an edge
+## [Unreleased] — Phase 6: make the edge question answerable
+
+### The edge study, as served (Stage T)
+- **Evaluated as served.** The study refits the served recipe every 600 samples, as the engine does, instead of training one model per fold. It uses 8 blocks in each development quarter and every block of the holdout, and each training window ends one horizon before its block. The rule reads quarters: at least 3 of 4, and the holdout.
+- **Training variants, fixed in advance.** 1 h and 4 h windows, and recency weights with a 1 h half-life, run on the three best label definitions alongside the feature ablations.
+- **A frozen protocol.** `docs/edge-study-protocol.md`, frozen 2026-10-08 14:55 UTC. Only bars from the freeze on can decide, and `ml_study.py --decide` refuses until 7 days of them exist. Runs on earlier bars are labelled exploratory, and every report carries the protocol's digest.
+- **Faster weighted fits.** Recency-weighted fits bin features at their unweighted quantiles first. scikit-learn computes a weighted percentile for every bin edge, which made weighted fits 5 to 17 times slower.
+
+### Fixed
+- Calibration fell back to an uncalibrated model whenever a calibration split's rows held a single class, as happens in very lopsided label definitions. A boosting model fitted on one class still answers with two probability columns; split models now keep only their own classes' columns.
+
+## Phase 5: ship, harden, test the model for an edge
 
 ### Deployment (Stage N)
 - `render.yaml` is a Blueprint for an always-on backend: 1 CPU / 2 GB, with a 5 GB disk holding SQLite and the trained models. Bars are kept 60 days.
