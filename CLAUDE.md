@@ -35,9 +35,10 @@ These rules come from the owner and still apply:
     - **E9 is approved (2026-10-07):** the rule requires beating both the class prior and the trailing prior. It was amended before the deciding data existed.
     - E9 and the live collector were pushed as `b2e3404`; CI #22 was all green.
 - **Phase 6** (`docs/implementation-plan.md` §12, "make the edge question answerable, and visible") was **approved 2026-10-08** with the recommended decisions F1–F6. The order is T → V → U → X.
-  - **Stage T** (the study, as served) was pushed 2026-10-08. Next is Stage V: verifying Dependabot #11 and #13 against `main`.
+  - **Stage T** (the study, as served) was pushed 2026-10-08 (`e421d27`); CI #23 was all green.
+  - **Stage V** is delivered in the working tree: Dependabot #11 and #13 each pass the full gates and e2e (39/39) merged onto `main`. Merging them is the owner's call. Next is Stage U (the edge study in the product).
   - **The protocol is frozen** at 2026-10-08 14:55 UTC (`docs/edge-study-protocol.md`, `study.FREEZE_MS`). Never examine bars from the freeze on, except through `ml_study.py --decide`, which refuses until 7 days of them exist. A change to the protocol after the freeze must be logged in its "Changes" section.
-  - **Pushed 2026-10-07:** the fix for Dependabot PR #12's failing install (`constraints.txt` no longer pins `pydantic-core`; plan §11.5). Dependabot replaced #12 with #13 (9 updates, including SQLAlchemy 2.1.3 and FastAPI 0.142.2), and CI #21 on it was all green. Merging it waits on the owner's word.
+  - **Pushed 2026-10-07:** the fix for Dependabot PR #12's failing install (`constraints.txt` no longer pins `pydantic-core`; plan §11.5). Dependabot replaced #12 with #13 (9 updates, including SQLAlchemy 2.1.3 and FastAPI 0.142.2); CI #21 on it was all green, and Stage V verified it against `main`. Merging it waits on the owner's word.
   - The owner's cutover steps are listed at the end of that entry: the push, the Render Blueprint, the Vercel environment variables.
   - After the cutover, verify with `python backend/scripts/smoke_deploy.py https://<backend>`. Only the owner runs it `--with-token`: the token never passes through Claude.
 - **Git:** the whole rebuild (Phases 3 and 4) is on `main`, pushed 2026-10-01 at the owner's request as a fast-forward. `overhaul/phase-3-4` is the merged branch and can be deleted.

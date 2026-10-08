@@ -1452,7 +1452,7 @@ Stage letters continue from Phase 4, skipping O (as I was skipped).
 
 ## 12. Phase 6 — Make the edge question answerable, and visible (proposed)
 
-> **Status:** proposed 2026-10-08, after the owner chose this direction over housekeeping only or a pause. Approved the same day ("continue") with the recommended decisions F1–F6. Stage T was pushed on 2026-10-08, and the protocol is frozen (14:55 UTC). Next is Stage V. Stages keep §7's review-stop discipline.
+> **Status:** proposed 2026-10-08, after the owner chose this direction over housekeeping only or a pause. Approved the same day ("continue") with the recommended decisions F1–F6. Stage T was pushed on 2026-10-08, and the protocol is frozen (14:55 UTC). Stage V is delivered in the working tree; next is Stage U. Stages keep §7's review-stop discipline.
 > **Inputs:**
 > - the Stage S study runs of 2026-10-03 and 2026-10-07 (`docs/edge-study.md`);
 > - the live collector's first hours: 18,310 bars (0.21 days) on 2026-10-07, one bar a second while it runs;
@@ -1584,3 +1584,19 @@ Stage letters continue from Phase 4, skipping O (as I was skipped).
     - the freeze splits bars;
     - calibration survives a split model that saw one class.
 - **Pushed 2026-10-08** at the owner's word. The freeze took effect at 14:55 UTC: bars from then on are deciding data, and nothing has examined them.
+
+**Stage V — Dependabot #11 and #13, verified against `main` (2026-10-08).** W5.
+
+- **Method.**
+  - Each PR's merge with `main` (`e421d27`) was written out with `git merge-tree` and a temporary index, into a scratch directory: no branch, commit or worktree.
+  - Both merge cleanly. Both PRs change only dependency files, so each merge is `main`'s code on the new dependencies.
+- **#13, the Python group (9 updates):** SQLAlchemy 2.0.54 → 2.1.3, FastAPI 0.141.1 → 0.142.2, uvicorn 0.53 → 0.54, websockets 17.1 → 17.2, PyJWT 2.15.0 → 2.15.1, and transitive pins.
+  - Installed into a throwaway Python 3.11 venv with the PR's `constraints.txt`. `pydantic-core` resolved to 2.46.5 through pydantic's own pin: the 2026-10-07 constraints fix works.
+  - Backend gate: ruff, ruff format and mypy clean; pip-audit clean; pytest 172 passed and 1 skipped, coverage 92.93 %.
+  - e2e with the backend on these dependencies (Playwright started the seed and uvicorn with the throwaway venv), and the seed template rebuilt through SQLAlchemy 2.1: **39 of 39** in 12.9 min.
+- **#11, the npm group (10 updates):** React and React DOM 19.2.8 → 19.3.0, three 0.186.0 → 0.186.1, `@react-three/fiber` 9.8.1, React Query 5.104.0, `lucide-react` 1.48.0, Vitest 5.0.2, jsdom 30.1.1, and the React types.
+  - The merge keeps the security update: `sharp` stays at 0.35.5.
+  - A fresh `npm ci` (500 packages). Frontend gate: Prettier, tsc, eslint, Vitest 29 and the build pass; npm audit of what ships is clean.
+  - e2e from the merged tree: **39 of 39** in 10.7 min, the Windows visual baselines included, so the icon and React bumps move nothing on screen.
+- **The owner's call.** Both are ready to merge, and a merge to `main` deploys. #13 carries the larger change (SQLAlchemy 2.1), which its own CI run #21 and this local run both passed.
+- **Stale Dependabot branches.** These were reported as 11 branches of closed PRs, but that came from out-of-date local tracking refs. On `origin` they had already been removed when their PRs closed. `git fetch --prune` cleared the local copies, so there was nothing to delete.
