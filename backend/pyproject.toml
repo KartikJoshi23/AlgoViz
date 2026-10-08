@@ -14,23 +14,23 @@ authors = [{ name = "Kartik Joshi" }]
 # still publish Python 3.11 wheels (numpy/scipy/shap ≥ next minor need 3.12).
 dependencies = [
     # Web
-    "fastapi==0.141.1",
-    "uvicorn[standard]==0.53.0",
+    "fastapi==0.142.2",
+    "uvicorn[standard]==0.54.0",
     "python-multipart==0.0.32",
     "orjson==3.12.0",
-    "websockets==17.1",
+    "websockets==17.2",
     "httpx==0.28.1",
     # Data / settings
     "pydantic==2.13.5",
     "pydantic-settings==2.15.0",
     # Persistence
-    "sqlalchemy[asyncio]==2.0.54",
+    "sqlalchemy[asyncio]==2.1.3",
     "aiosqlite==0.22.1",
     "asyncpg==0.31.0",  # Postgres via DATABASE_URL for hosted deployments (D5)
     "alembic==1.20.0",
     # Auth
     "bcrypt==5.0.0",
-    "PyJWT==2.15.0",
+    "PyJWT==2.15.1",
     # Observability
     "prometheus-client==0.26.0",
     # Numerics / ML
@@ -50,8 +50,8 @@ dev = [
     "pytest-asyncio==1.4.0",
     "pytest-cov==7.1.0",
     "hypothesis==6.168.3",
-    "ruff==0.16.8",
-    "mypy==2.3.1",
+    "ruff==0.16.10",
+    "mypy==2.4.0",
     "pip-audit==2.10.1",
 ]
 
