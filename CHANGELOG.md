@@ -23,6 +23,7 @@ Notable changes, newest first. The format follows
 
 ### Fixed
 - Calibration fell back to an uncalibrated model whenever a calibration split's rows held a single class, as happens in very lopsided label definitions. A boosting model fitted on one class still answers with two probability columns; split models now keep only their own classes' columns.
+- The signal rules' descriptions wrap instead of being cut off. The full text was only in a hover tooltip, which touch screens never show.
 
 ## Phase 5: ship, harden, test the model for an edge
 

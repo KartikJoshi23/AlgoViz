@@ -120,7 +120,7 @@ export function SignalRulesPanel({ symbol }: { symbol: string | null }) {
                   </td>
                   <td>
                     <span className="block text-ink">{r.name}</span>
-                    <span className="block max-w-[22rem] truncate text-caption text-ink-faint" title={r.action}>
+                    <span className="block min-w-[14rem] max-w-[22rem] whitespace-normal text-caption text-ink-faint">
                       {r.action} · {r.tags.join(" · ")}
                     </span>
                   </td>

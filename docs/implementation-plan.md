@@ -1633,3 +1633,13 @@ Stage letters continue from Phase 4, skipping O (as I was skipped).
       - Then the verdict, the tiles (+0.015 in development, 2 of 4 quarters; holdout +0.040, log-loss 0.622 vs 0.662) and eight rows with their spread.
       - At 390 px the page is 390 wide and nothing is truncated; the table scrolls in its wrapper. The no-study state checked the same way, on the synthetic backend.
     - The regenerated `docs/edge-study.md` is byte-identical to Stage T's. The migration applied on the live database at the collector's restart.
+
+**Check of the app as it stands (2026-10-09).** Only Stage X remains, gated on data, so the app was checked again before proposing anything further.
+
+- **Collector:** healthy (loop lag p99 25 ms, connected). The 11 skipped inferences in its log all fell within heavy local runs (studies, e2e, pytest), and none happened under normal load.
+- **Storage, measured on a vacuumed copy:** 556 bytes per bar with both indexes (2.9 GB at 60 days), plus 0.1 GB of predictions at 7-day retention. That fits Render's 5 GB disk.
+- **UI:** every route at 1440 and 390 px on the live feed: no overflow, no alerts, no panel stuck loading.
+  - One read-out was cut off: the signal rules' descriptions (`truncate`, the full text only in a `title`, which touch never shows). They now wrap, between 14 and 22 rem.
+  - A console "Object is disposed" from the charts came from the inspection shim, not the app: it replaced `requestAnimationFrame` but not `cancelAnimationFrame`.
+- **Nothing found warrants a Phase 7.** The next step is Stage X once 7 days of bars from the freeze on exist (0.21 days on 2026-10-09).
+
