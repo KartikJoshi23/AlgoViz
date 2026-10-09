@@ -1653,5 +1653,6 @@ Stage letters continue from Phase 4, skipping O (as I was skipped).
   - **#16, ESLint 10:** CI #28 failed at lint with exit code 2. Reproduced on a scratch merge: `react/display-name` throws `contextOrFilename.getFilename is not a function`. ESLint 10 removed `context.getFilename()`, and the eslint-plugin-react inside eslint-config-next 16.3.8 still calls it.
   - **#17, TypeScript 7:** CI #30 failed at `npm ci`. typescript-eslint, which Next's lint config depends on, accepts only `typescript >=4.8.4 <6.1.0`, so the install can't resolve.
   - **#19, @types/node 26:** CI #33 is green, but the runtime is Node 22 everywhere (CI, Docker, `engines`). Node 26's types would accept APIs that Node 22 lacks, so the rule pins the types to the runtime (< 23), as the Docker rules pin the images.
-  - The three open PRs still need closing on GitHub. That is the owner's action, since the API needs a sign-in this machine doesn't have.
+  - The owner had #14, #15 and #18 merged (`80d6df7`, `e4f196d`, `021f10e`), after a local check of the combined merge: the frontend gate on the new lockfile, and the backend rebuilt under setuptools ≥ 84 with the property and API tests.
+  - Dependabot closed #16, #17 and #19 itself, the moment the ignore rules reached `main` ("no longer being updated by Dependabot").
 
