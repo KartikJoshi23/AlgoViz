@@ -14,6 +14,7 @@ Notable changes, newest first. The format follows
 - Dependabot #13: SQLAlchemy 2.1.3, FastAPI 0.142.2, uvicorn 0.54, websockets 17.2, PyJWT 2.15.1.
 - Dependabot #11: React 19.3, three 0.186.1, Vitest 5.0.2, React Query 5.104, lucide-react 1.48.
 - Both were verified against `main` (gates and e2e) before merging.
+- Dependabot ignores @types/node beyond the Node 22 runtime, and ESLint and TypeScript majors until their blockers ship fixes: eslint-plugin-react on ESLint 10, typescript-eslint on TypeScript 7.
 
 ### The edge study, as served (Stage T)
 - **Evaluated as served.** The study refits the served recipe every 600 samples, as the engine does, instead of training one model per fold. It uses 8 blocks in each development quarter and every block of the holdout, and each training window ends one horizon before its block. The rule reads quarters: at least 3 of 4, and the holdout.

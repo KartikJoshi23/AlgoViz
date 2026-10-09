@@ -1643,3 +1643,15 @@ Stage letters continue from Phase 4, skipping O (as I was skipped).
   - A console "Object is disposed" from the charts came from the inspection shim, not the app: it replaced `requestAnimationFrame` but not `cancelAnimationFrame`.
 - **Nothing found warrants a Phase 7.** The next step is Stage X once 7 days of bars from the freeze on exist (0.21 days on 2026-10-09).
 
+**Dependabot's weekly run (2026-10-09).** Six PRs, opened 2026-10-08:
+
+- **Green, and minor, patch or a build pin.** These are ready for the owner's merge call:
+  - #14, the npm group: React Query, @vitejs/plugin-react, jsdom, lucide-react, postcss, Vitest (CI #26);
+  - #15, hypothesis 6.168.4 (CI #27);
+  - #18, setuptools ≥ 84 as the build requirement (CI #32).
+- **Majors, held back.** `.github/dependabot.yml` now ignores them until each is usable, so they stop reopening every week.
+  - **#16, ESLint 10:** CI #28 failed at lint with exit code 2. Reproduced on a scratch merge: `react/display-name` throws `contextOrFilename.getFilename is not a function`. ESLint 10 removed `context.getFilename()`, and the eslint-plugin-react inside eslint-config-next 16.3.8 still calls it.
+  - **#17, TypeScript 7:** CI #30 failed at `npm ci`. typescript-eslint, which Next's lint config depends on, accepts only `typescript >=4.8.4 <6.1.0`, so the install can't resolve.
+  - **#19, @types/node 26:** CI #33 is green, but the runtime is Node 22 everywhere (CI, Docker, `engines`). Node 26's types would accept APIs that Node 22 lacks, so the rule pins the types to the runtime (< 23), as the Docker rules pin the images.
+  - The three open PRs still need closing on GitHub. That is the owner's action, since the API needs a sign-in this machine doesn't have.
+

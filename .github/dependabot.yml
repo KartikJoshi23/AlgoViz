@@ -13,6 +13,18 @@ updates:
     schedule: { interval: weekly }
     groups:
       npm: { patterns: ["*"], update-types: [minor, patch] }
+    ignore:
+      # The types follow the runtime: Node 22 in CI, Docker and `engines` (newer types
+      # would accept APIs Node 22 lacks, and type-check green).
+      - dependency-name: "@types/node"
+        versions: [">=23"]
+      # Blocked upstream (2026-10-09). ESLint 10 removed context.getFilename(), which
+      # eslint-plugin-react (inside eslint-config-next) still calls; typescript-eslint
+      # accepts typescript <6.1. Drop each rule once its blocker ships a fix.
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
